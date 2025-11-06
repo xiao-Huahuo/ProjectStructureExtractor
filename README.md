@@ -1,0 +1,76 @@
+# 项目结构生成器
+
+本项目是一个基于 Python 的图形化工具，用于扫描指定目录的文件结构，生成对应的 Markdown 目录树与 JSON 格式的文件内容索引。
+用户可通过界面选择项目路径、结果输出路径、以及需要忽略的目录，快速构建项目结构文档。
+
+## 功能简介
+
+* 支持选择任意目录作为扫描根路径
+* 可配置忽略的目录（如 `node_modules`、`dist` 等）
+* 生成两种输出结果：
+
+  1. **project_content.json**：保存项目中每个文件的路径及其内容
+  2. **project_tree.md**：以树形结构展示项目文件层级
+* 自动跳过二进制文件，防止读取异常
+* 所有配置项（包括默认路径与忽略目录）均保存在 `settings.json` 中，可自动加载与保存
+
+## 项目结构
+
+```
+./
+├── JsonWriter.py              # JSON 文件写入器
+├── ProjectStructureExtract.py # 目录扫描器
+├── ProjectStructureTree.py    # 树形结构生成器
+├── ProjectStructureGUI.py     # 主图形界面程序
+├── globalConstants.py         # 全局常量定义
+├── settings.json              # 默认配置文件
+├── __main__.py                # 程序入口
+└── README.md                  # README文件
+```
+
+## 运行环境
+
+* Python 3.9 及以上版本
+* 依赖库：
+
+  ```bash
+  pip install tkinter
+  ```
+  （部分 Python 环境已自带 tkinter）
+
+## 使用方法
+
+1. 运行程序：
+
+   ```bash
+   python ProjectStructureGUI.py
+   ```
+
+2. 在界面中：
+
+   * 选择项目根目录（Root Dir）
+   * 添加或移除忽略的文件夹
+   * 选择输出目录（Result Dir）
+   * 点击 “生成 JSON” 或 “生成 Tree” 按钮即可输出结果
+
+3. 程序将在输出目录中生成：
+
+   * `project_content.json`
+   * `project_tree.md`
+
+## 打包为可执行程序
+
+如需在 Windows 下生成可执行文件，可使用以下命令：
+
+```bash
+pip install pyinstaller
+rmdir /s /q build
+rmdir /s /q dist
+pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "settings.json;." --icon=./static/app.ico __main__.py
+```
+
+生成的可执行文件位于 `dist/` 目录中，可直接运行。
+
+## 许可协议
+
+本项目仅用于学习与研究目的，作者保留最终解释权。
