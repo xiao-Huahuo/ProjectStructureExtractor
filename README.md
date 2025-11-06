@@ -68,7 +68,8 @@
 
 ## 打包为可执行程序
 
-如需在 Windows 下生成可执行文件，可使用以下命令：
+##### Windows
+Windows 下生成可执行文件，可使用以下命令：
 
 ```bash
 pip install pyinstaller
@@ -79,6 +80,14 @@ pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "set
 
 生成的可执行文件位于 `dist/` 目录中，可直接运行。
 
+##### MacOS
+在MacOS中,在终端执行:
+```bash
+pip install pyinstaller
+pyinstaller --noconsole --name "项目结构生成器" --add-data "settings.json:." --icon=static/app.icu __main__.py
+```
+打包好的可执行文件会在：
+`dist/项目结构生成器.app`
 ## 许可协议
 
 本项目仅用于学习与研究目的，作者保留最终解释权。
