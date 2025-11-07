@@ -16,11 +16,11 @@
 
 ## 功能截图
 - 项目主界面
-![项目主界面](./static/base.png)
+![项目主界面](static/base.png)
 - 生成文件树
-![生成文件树](./static/tree.png)
+![生成文件树](static/tree.png)
 - 生成结构JSON
-![生成结构JSON](./static/json.png)
+![生成结构JSON](static/json.png)
 
 ## 项目结构
 
@@ -75,7 +75,7 @@ Windows 下生成可执行文件，可使用以下命令：
 
 ```bash
 pip install pyinstaller
-pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "settings.json;." --icon=./static/app.ico __main__.py
+pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "src/configure/settings.json;." --icon=./static/app.ico ./src/__main__.py
 ```
 
 生成的可执行文件位于 `dist/` 目录中，可直接运行。
@@ -84,7 +84,7 @@ pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "set
 在MacOS中,在终端执行:
 ```bash
 pip install pyinstaller
-pyinstaller --noconsole --name "项目结构生成器" --add-data "settings.json:." --icon=static/app.icu __main__.py
+pyinstaller --noconsole --name "项目结构生成器" --add-data "src/configure/settings.json:." --icon=static/app.icns ./src/__main__.py
 ```
 打包好的可执行文件会在：
 `dist/项目结构生成器.app`

@@ -185,18 +185,12 @@ class ProjectStructureApp:
     def _set_root_default(self):
         """将当前项目根目录设为默认值"""
         current_root = self.root_dir_var.get().strip()
-        if not current_root:
-            messagebox.showwarning("警告", "根目录不能为空。")
-            return
         self.original_root=current_root
 
 
     def _set_result_default(self):
         """将当前输出目录设为默认值"""
         current_result = self.result_dir_var.get().strip()
-        if not current_result:
-            messagebox.showwarning("警告", "输出目录不能为空。")
-            return
         self.original_result=current_result
 
     # =================== 忽略目录管理 ===================
