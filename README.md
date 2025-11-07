@@ -12,7 +12,7 @@
   1. **project_content.json**：保存项目中每个文件的路径及其内容
   2. **project_tree.md**：以树形结构展示项目文件层级
 * 自动跳过二进制文件，防止读取异常
-* 所有配置项（包括默认路径与忽略目录）均保存在 `settings.json` 中，可自动加载与保存
+* 所有配置项（包括默认路径与忽略目录/文件）均保存在 `settings.json` 中，可自动加载与保存
 
 ## 功能截图
 - 项目主界面
@@ -57,8 +57,10 @@
 2. 在界面中：
 
    * 选择项目根目录（Root Dir）
-   * 添加或移除忽略的文件夹
    * 选择输出目录（Result Dir）
+   * (可选)可以将根目录或输出目录保存为默认值
+   * 添加或移除忽略的文件夹
+   * 修改需要忽略的文件后缀名
    * 点击 “生成 JSON” 或 “生成 Tree” 按钮即可输出结果
 
 3. 程序将在输出目录中生成：
@@ -73,8 +75,6 @@ Windows 下生成可执行文件，可使用以下命令：
 
 ```bash
 pip install pyinstaller
-rmdir /s /q build
-rmdir /s /q dist
 pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "settings.json;." --icon=./static/app.ico __main__.py
 ```
 
