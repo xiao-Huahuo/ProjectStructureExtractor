@@ -1,0 +1,29 @@
+{
+  "ROOT_DIR": "D:/Projects/SpringBoot/MatchIt_ClubSystem",
+  "RESULT_DIR": "C:/Users/slump/Desktop",
+  "IGNORE_DIRS": [
+    "node_modules",
+    "dist",
+    ".git",
+    ".venv",
+    ".gradle",
+    ".idea",
+    "build",
+    "FileContentIndex",
+    "__pycache__",
+    "static",
+    "v17",
+    ".vs",
+    ".vscode"
+  ],
+  "IGNORE_FILE_TYPES": [
+    ".pyc",
+    ".vsidx",
+    ".wsuo",
+    ".sqlite",
+    ".ds_store",
+    ".exe"
+  ],
+  "TREE_FILE": "project_tree.md",
+  "CONTENT_FILE": "project_content.json"
+}
