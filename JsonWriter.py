@@ -7,12 +7,13 @@ import string
 import re
 #将文件全路径和文件内容写入json
 class Writer:
-    def __init__(self,root_dir,ignore_dirs=None):
+    def __init__(self,root_dir,ignore_dirs=None,ignore_file_types=None):
         self.root_dir = root_dir
-        self.file_paths = Extractor(root_dir,ignore_dirs).extractProjectStructure() #获取根目录下所有文件的全路径
+        self.file_paths = Extractor(root_dir,ignore_dirs,ignore_file_types).extractProjectStructure() #获取根目录下所有文件的全路径
         #print(len(self.file_paths))
         self.contents = dict((path, '') for path in self.file_paths) #键值对: <文件路径,文件内容字符串>
         self.ignore_dirs=ignore_dirs
+        self.ignore_file_types=ignore_file_types
         return
 
     #写json文件

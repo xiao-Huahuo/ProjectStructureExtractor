@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 #项目结构树生成器
 class TreeBuilder:
-    def __init__(self,root_dir,ignore_dirs=None):
+    def __init__(self,root_dir,ignore_dirs=None,ignore_file_types=None):
         self.root_dir = root_dir
-        self.file_paths = Extractor(root_dir,ignore_dirs).extractProjectStructure() #获取全路径列表
+        self.file_paths = Extractor(root_dir,ignore_dirs,ignore_file_types).extractProjectStructure() #获取全路径列表
         self.ignore_dirs=ignore_dirs
+        self.ignore_file_types=ignore_file_types
         return
 
     # 生成目录树字符串（Markdown风格，含📁📄）并保存

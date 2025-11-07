@@ -1,6 +1,6 @@
 {
   "ROOT_DIR": "",
-  "RESULT_DIR": "C:\\Users\\Administrator\\Desktop",
+  "RESULT_DIR": "",
   "IGNORE_DIRS": [
     "node_modules",
     "dist",

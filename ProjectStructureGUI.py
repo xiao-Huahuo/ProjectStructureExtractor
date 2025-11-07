@@ -6,7 +6,7 @@ from ProjectStructureTree import TreeBuilder
 from pathlib import Path
 import json
 import os
-from globalConstants import *
+from defaultSettings import *
 
 class ProjectStructureApp:
     def __init__(self):
@@ -15,17 +15,17 @@ class ProjectStructureApp:
         self.root.geometry("720x520")
         self.root.resizable(False, False)
 
+        #默认配置,读取defaultSettings的参数
         self.default_settings = {
-            "ROOT_DIR": "",
-            "RESULT_DIR": "",
-            "IGNORE_DIRS": ["node_modules", "dist", ".git"]
+            "ROOT_DIR": DEFAULT_SETTINGS["ROOT_DIR"],
+            "RESULT_DIR": DEFAULT_SETTINGS["RESULT_DIR"],
+            "IGNORE_DIRS": DEFAULT_SETTINGS["IGNORE_DIRS"],
         }
 
         # --- 加载设置 ---
         self.settings = self._load_settings()
         self.original_root = self.settings["ROOT_DIR"]
         self.original_result = self.settings["RESULT_DIR"]
-
         self.ignore_dirs = list(self.settings["IGNORE_DIRS"])
         self.ignore_check_vars = {}
 
