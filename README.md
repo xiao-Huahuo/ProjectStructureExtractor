@@ -16,19 +16,11 @@
 
 ## 功能截图
 - 项目主界面
-<<<<<<< HEAD
 ![项目主界面](./static/base.png)
 - 生成文件树
 ![生成文件树](./static/tree.png)
 - 生成结构JSON
 ![生成结构JSON](./static/json.png)
-=======
-![项目主界面](static/base.png)
-- 生成文件树
-![生成文件树](static/tree.png)
-- 生成结构JSON
-![生成结构JSON](static/json.png)
->>>>>>> 3726b819926d8867f5a0dd018e4c6f65dca79fe1
 
 ## 项目结构
 
@@ -75,6 +67,14 @@
 
    * `project_content.json`
    * `project_tree.md`
+
+### 视频教程
+
+<video src="./static/使用方法.mp4" controls width="600" height="400">
+  您的浏览器不支持播放该视频。请下载 [使用方法.mp4](./static/使用方法.mp4) 进行观看。
+</video>
+
+或者您可以直接点击链接下载：[使用方法.mp4](./static/使用方法.mp4)
 
 ## 打包为可执行程序
 
