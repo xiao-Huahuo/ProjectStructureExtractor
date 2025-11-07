@@ -6,8 +6,9 @@ DEFAULT_SETTINGS = {
         ".git",
         "__pycache__",
         ".idea",
-        "venv",
-        "node_modules"
+        ".venv",
+        "node_modules",
+        "v17"
         # 可以根据您项目的project_tree.md添加更多默认忽略项
     ],
     # 默认忽略的文件扩展名列表
@@ -49,6 +50,7 @@ DEFAULT_SETTINGS = {
     ".png",      # PNG 图像
     ".gif",      # GIF 图像
     ".ico",      # 图标
+    ".icns",
     ".svg",      # SVG (虽然是文本，但通常作为资源忽略)
     ".webp",     # WebP 图像
     ".bmp",      # BMP 图像
