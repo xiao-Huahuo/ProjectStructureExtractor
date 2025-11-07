@@ -20,14 +20,22 @@ class ProjectStructureApp:
             "ROOT_DIR": DEFAULT_SETTINGS["ROOT_DIR"],
             "RESULT_DIR": DEFAULT_SETTINGS["RESULT_DIR"],
             "IGNORE_DIRS": DEFAULT_SETTINGS["IGNORE_DIRS"],
+            "IGNORE_FILE_TYPES": DEFAULT_SETTINGS["IGNORE_FILE_TYPES"],
+            "TREE_FILE": DEFAULT_SETTINGS["TREE_FILE"],
+            "CONTENT_FILE": DEFAULT_SETTINGS["CONTENT_FILE"],
         }
 
         # --- 加载设置 ---
         self.settings = self._load_settings()
         self.original_root = self.settings["ROOT_DIR"]
         self.original_result = self.settings["RESULT_DIR"]
+        self.tree_file = self.settings["TREE_FILE"]
+        self.content_file = self.settings["CONTENT_FILE"]
         self.ignore_dirs = list(self.settings["IGNORE_DIRS"])
+        self.ignore_file_types = list(self.settings["IGNORE_FILE_TYPES"])
         self.ignore_check_vars = {}
+        # Text 控件变量，先初始化为 None
+        self.ignore_file_types_text = None
 
         self._build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -55,10 +63,23 @@ class ProjectStructureApp:
 
     def _save_settings(self):
         """保存当前设置到 settings.json"""
+
+        #获取忽略文件类型列表
+        ignore_file_types_list = [
+            t.strip().lower()  # 转换为小写并去除空格
+            for t in self.ignore_file_types_text.get('1.0', tk.END).splitlines()
+            if t.strip()
+        ]
+        self.settings["IGNORE_FILE_TYPES"] = ignore_file_types_list  # 更新内部 settings 字典
+        self.ignore_file_types = ignore_file_types_list  # 更新属性
+
         data = {
             "ROOT_DIR": self.settings["ROOT_DIR"],
             "RESULT_DIR": self.settings["RESULT_DIR"],
-            "IGNORE_DIRS": self.ignore_dirs
+            "IGNORE_DIRS": self.ignore_dirs,
+            "IGNORE_FILE_TYPES": self.settings["IGNORE_FILE_TYPES"],
+            "TREE_FILE": self.settings["TREE_FILE"],
+            "CONTENT_FILE": self.settings["CONTENT_FILE"],
         }
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -83,19 +104,25 @@ class ProjectStructureApp:
         tk.Entry(frame, textvariable=self.result_dir_var, width=55).grid(row=1, column=1, padx=5)
         tk.Button(frame, text="选择", command=self._choose_result_dir).grid(row=1, column=2)
 
-        # 忽略目录
-        ignore_frame = tk.LabelFrame(self.root, text="忽略的目录", padx=10, pady=10)
-        ignore_frame.pack(padx=20, pady=10, fill="both", expand=True)
+        # ====== 忽略配置区域的主容器 (实现二分天下布局) ======
+        ignore_main_frame = tk.Frame(self.root)
+        ignore_main_frame.pack(padx=20, pady=10, fill="both", expand=True)
 
-        input_frame = tk.Frame(ignore_frame)
+        # ------------------ 左侧: 忽略目录 (原有复选框逻辑) ------------------
+        # 原本的 ignore_frame 变为 ignore_dirs_frame
+        ignore_dirs_frame = tk.LabelFrame(ignore_main_frame, text="忽略的目录", padx=10, pady=10)
+        ignore_dirs_frame.pack(side=tk.LEFT, padx=5, fill="both", expand=True)
+
+        # 目录添加输入框
+        input_frame = tk.Frame(ignore_dirs_frame)
         input_frame.pack(fill="x")
         tk.Label(input_frame, text="添加忽略目录:").pack(side="left")
         self.new_ignore_var = tk.StringVar()
-        tk.Entry(input_frame, textvariable=self.new_ignore_var, width=40).pack(side="left", padx=5)
+        tk.Entry(input_frame, textvariable=self.new_ignore_var, width=20).pack(side="left", padx=5)
         tk.Button(input_frame, text="添加", command=self._add_ignore_dir).pack(side="left")
 
-        # 滚动区域
-        scroll_container = tk.Frame(ignore_frame)
+        # 滚动区域 (目录复选框)
+        scroll_container = tk.Frame(ignore_dirs_frame)
         scroll_container.pack(fill="both", expand=True, pady=5)
 
         self.canvas = tk.Canvas(scroll_container, height=150)
@@ -113,7 +140,20 @@ class ProjectStructureApp:
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
 
-        self._refresh_ignore_checkboxes()
+        self._refresh_ignore_checkboxes()  # 刷新目录复选框
+
+        # ------------------ 右侧: 忽略文件类型 (新增 Text 控件) ------------------
+        ignore_types_frame = tk.LabelFrame(ignore_main_frame, text="忽略的文件类型", padx=10, pady=10)
+        ignore_types_frame.pack(side=tk.LEFT, padx=5, fill="both", expand=True)  # 并排布局
+
+        tk.Label(ignore_types_frame, text="文件扩展名 (一行一个, 需带.):").pack(anchor='w', pady=(0, 5))
+        # 【新增】忽略文件类型文本框，并赋值给 self.ignore_file_types_text
+        self.ignore_file_types_text = tk.Text(ignore_types_frame, height=10)
+        self.ignore_file_types_text.pack(fill='both', expand=True)
+
+        # 加载初始值
+        self._load_file_types_to_text()
+        # ------------------------------------------------------------------
 
         # 按钮区
         btn_frame = tk.Frame(self.root)
@@ -127,6 +167,14 @@ class ProjectStructureApp:
         self.status_var = tk.StringVar(value="等待操作中...")
         status_bar = tk.Label(self.root, textvariable=self.status_var, bd=1, relief="sunken", anchor="w")
         status_bar.pack(side="bottom", fill="x")
+
+    # 加载文件类型到文本框
+    def _load_file_types_to_text(self):
+        """填充忽略文件类型文本框"""
+        ignore_types_str = "\n".join(self.ignore_file_types)
+        # 此时 self.ignore_file_types_text 已经被 _build_ui 赋值，可以直接使用
+        self.ignore_file_types_text.delete('1.0', tk.END)
+        self.ignore_file_types_text.insert(tk.END, ignore_types_str)
 
     # =================== 忽略目录管理 ===================
     def _refresh_ignore_checkboxes(self):
@@ -178,13 +226,19 @@ class ProjectStructureApp:
         result_dir = self.result_dir_var.get().strip()
         ignores = self._get_active_ignores()
 
+        # 从文本框实时读取忽略文件类型
+        ignore_file_types = [
+            t.strip().lower() for t in self.ignore_file_types_text.get('1.0', tk.END).splitlines()
+            if t.strip()
+        ]
+
         if not root_dir or not result_dir:
             messagebox.showwarning("警告", "请先填写项目根目录和输出目录！")
             return
 
-        result_path = Path(result_dir) / "project_content.json"
+        result_path = Path(result_dir) / self.content_file
         try:
-            writer = Writer(root_dir, ignores)
+            writer = Writer(root_dir, ignores, ignore_file_types)
             writer.updateFile(result_path)
             self.status_var.set(f"✅ JSON 已生成: {result_path}")
             messagebox.showinfo("成功", f"JSON 文件生成成功！\n{result_path}")
@@ -197,13 +251,19 @@ class ProjectStructureApp:
         result_dir = self.result_dir_var.get().strip()
         ignores = self._get_active_ignores()
 
+        # 从文本框实时读取忽略文件类型
+        ignore_file_types = [
+            t.strip().lower() for t in self.ignore_file_types_text.get('1.0', tk.END).splitlines()
+            if t.strip()
+        ]
+
         if not root_dir or not result_dir:
             messagebox.showwarning("警告", "请先填写项目根目录和输出目录！")
             return
 
-        result_path = Path(result_dir) / "project_tree.md"
+        result_path = Path(result_dir) / self.tree_file
         try:
-            tree = TreeBuilder(root_dir, ignores)
+            tree = TreeBuilder(root_dir, ignores, ignore_file_types)
             content = tree.buildTree(result_path)
             self.status_var.set(f"✅ 目录树已生成: {result_path}")
             self._show_tree_window(content)
@@ -223,9 +283,25 @@ class ProjectStructureApp:
 
     # =================== 退出恢复逻辑 ===================
     def _on_close(self):
-        """退出前恢复 ROOT_DIR、RESULT_DIR 到初始值，但保存 IGNORE_DIRS"""
+        """退出前恢复 ROOT_DIR、RESULT_DIR 到初始值，但保存 IGNORE_DIRS 和 IGNORE_FILE_TYPES"""
+
+        # 调用 _save_settings，确保从文本框中读取的最新文件类型被保存到 self.settings 和 settings.json
+        self._save_settings()
+
+        # 恢复根目录和结果目录到初始值（原逻辑）
         self.settings["ROOT_DIR"] = self.original_root
         self.settings["RESULT_DIR"] = self.original_result
-        self.settings["IGNORE_DIRS"] = self.ignore_dirs
-        self._save_settings()
+
+        # 再次保存，将恢复后的 ROOT_DIR 和 RESULT_DIR 写入 settings.json
+        data = {
+            "ROOT_DIR": self.settings["ROOT_DIR"],
+            "RESULT_DIR": self.settings["RESULT_DIR"],
+            "IGNORE_DIRS": self.ignore_dirs,
+            "IGNORE_FILE_TYPES": self.settings["IGNORE_FILE_TYPES"],
+            "TREE_FILE": self.settings["TREE_FILE"],
+            "CONTENT_FILE": self.settings["CONTENT_FILE"],
+        }
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
         self.root.destroy()
