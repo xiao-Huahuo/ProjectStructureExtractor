@@ -16,11 +16,19 @@
 
 ## 功能截图
 - 项目主界面
+<<<<<<< HEAD
 ![项目主界面](./static/base.png)
 - 生成文件树
 ![生成文件树](./static/tree.png)
 - 生成结构JSON
 ![生成结构JSON](./static/json.png)
+=======
+![项目主界面](static/base.png)
+- 生成文件树
+![生成文件树](static/tree.png)
+- 生成结构JSON
+![生成结构JSON](static/json.png)
+>>>>>>> 3726b819926d8867f5a0dd018e4c6f65dca79fe1
 
 ## 项目结构
 
