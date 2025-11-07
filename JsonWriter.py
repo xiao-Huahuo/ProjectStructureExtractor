@@ -50,52 +50,53 @@ class Writer:
         - 检查可打印字符比例；
         - 检查常见二进制魔数与结构关键字；
         """
-        try:
-            file_size = os.path.getsize(file_path)
-            if file_size == 0:
-                return False
-
-            printable = set(bytes(string.printable, 'ascii'))
-            binary_hits = 0
-            sample_hits = 0
-
-            with open(file_path, 'rb') as f:
-                for _ in range(sample_count):
-                    pos = random.randint(0, max(0, file_size - sample_size))
-                    f.seek(pos)
-                    chunk = f.read(sample_size)
-                    if not chunk:
-                        continue
-                    sample_hits += 1
-
-                    # 若含明显非文本字符或 NULL
-                    if b'\0' in chunk:
-                        binary_hits += 1
-                        continue
-
-                    # 可打印比例太低 → 二进制
-                    ratio = sum(b in printable for b in chunk) / len(chunk)
-                    if ratio < 0.9:
-                        binary_hits += 1
-                        continue
-
-                    # 检查常见二进制文件特征
-                    if any(sig in chunk[:64] for sig in [
-                        b'%PDF', b'\x89PNG', b'JFIF', b'Exif',
-                        b'PK\x03\x04',  # zip/docx/jar
-                        b'IDAT',  # PNG data
-                        b'OTTO', b'wOFF', b'wOFF2',  # 字体文件
-                        b'\xFF\xD8', b'\xFF\xD9',  # JPEG start/end
-                    ]):
-                        binary_hits += 1
-                        continue
-
-                    # 检查伪文本型二进制 (PDF/Font/stream 等)
-                    if re.search(rb'(/Font|/Subtype|stream|endobj|/CharProcs)', chunk):
-                        binary_hits += 1
-
-            if sample_hits == 0:
-                return True
-            return binary_hits / sample_hits > 0.2
-        except Exception:
-            return True
+        return False
+        # try:
+        #     file_size = os.path.getsize(file_path)
+        #     if file_size == 0:
+        #         return False
+        #
+        #     printable = set(bytes(string.printable, 'ascii'))
+        #     binary_hits = 0
+        #     sample_hits = 0
+        #
+        #     with open(file_path, 'rb') as f:
+        #         for _ in range(sample_count):
+        #             pos = random.randint(0, max(0, file_size - sample_size))
+        #             f.seek(pos)
+        #             chunk = f.read(sample_size)
+        #             if not chunk:
+        #                 continue
+        #             sample_hits += 1
+        #
+        #             # 若含明显非文本字符或 NULL
+        #             if b'\0' in chunk:
+        #                 binary_hits += 1
+        #                 continue
+        #
+        #             # 可打印比例太低 → 二进制
+        #             ratio = sum(b in printable for b in chunk) / len(chunk)
+        #             if ratio < 0.9:
+        #                 binary_hits += 1
+        #                 continue
+        #
+        #             # 检查常见二进制文件特征
+        #             if any(sig in chunk[:64] for sig in [
+        #                 b'%PDF', b'\x89PNG', b'JFIF', b'Exif',
+        #                 b'PK\x03\x04',  # zip/docx/jar
+        #                 b'IDAT',  # PNG data
+        #                 b'OTTO', b'wOFF', b'wOFF2',  # 字体文件
+        #                 b'\xFF\xD8', b'\xFF\xD9',  # JPEG start/end
+        #             ]):
+        #                 binary_hits += 1
+        #                 continue
+        #
+        #             # 检查伪文本型二进制 (PDF/Font/stream 等)
+        #             if re.search(rb'(/Font|/Subtype|stream|endobj|/CharProcs)', chunk):
+        #                 binary_hits += 1
+        #
+        #     if sample_hits == 0:
+        #         return True
+        #     return binary_hits / sample_hits > 0.2
+        # except Exception:
+        #     return True
