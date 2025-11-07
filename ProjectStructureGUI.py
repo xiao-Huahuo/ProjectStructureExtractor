@@ -36,7 +36,11 @@ class ProjectStructureApp:
         self.ignore_check_vars = {}
         # Text 控件变量，先初始化为 None
         self.ignore_file_types_text = None
+        #默认值变量
+        self.root_dir_var = tk.StringVar(value=self.settings["ROOT_DIR"])
+        self.result_dir_var = tk.StringVar(value=self.settings["RESULT_DIR"])
 
+        #构建UI
         self._build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.mainloop()
@@ -97,12 +101,14 @@ class ProjectStructureApp:
         self.root_dir_var = tk.StringVar(value=self.settings["ROOT_DIR"])
         tk.Entry(frame, textvariable=self.root_dir_var, width=55).grid(row=0, column=1, padx=5)
         tk.Button(frame, text="选择", command=self._choose_root_dir).grid(row=0, column=2)
+        tk.Button(frame, text="设为默认", command=self._set_root_default).grid(row=0, column=3, padx=5)
 
         # RESULT_DIR
         tk.Label(frame, text="输出目录:").grid(row=1, column=0, sticky="w")
         self.result_dir_var = tk.StringVar(value=self.settings["RESULT_DIR"])
         tk.Entry(frame, textvariable=self.result_dir_var, width=55).grid(row=1, column=1, padx=5)
         tk.Button(frame, text="选择", command=self._choose_result_dir).grid(row=1, column=2)
+        tk.Button(frame, text="设为默认", command=self._set_result_default).grid(row=1, column=3, padx=5)
 
         # ====== 忽略配置区域的主容器 (实现二分天下布局) ======
         ignore_main_frame = tk.Frame(self.root)
@@ -168,13 +174,30 @@ class ProjectStructureApp:
         status_bar = tk.Label(self.root, textvariable=self.status_var, bd=1, relief="sunken", anchor="w")
         status_bar.pack(side="bottom", fill="x")
 
-    # 加载文件类型到文本框
     def _load_file_types_to_text(self):
         """填充忽略文件类型文本框"""
         ignore_types_str = "\n".join(self.ignore_file_types)
         # 此时 self.ignore_file_types_text 已经被 _build_ui 赋值，可以直接使用
         self.ignore_file_types_text.delete('1.0', tk.END)
         self.ignore_file_types_text.insert(tk.END, ignore_types_str)
+
+    # =================== 设为默认管理 ===================
+    def _set_root_default(self):
+        """将当前项目根目录设为默认值"""
+        current_root = self.root_dir_var.get().strip()
+        if not current_root:
+            messagebox.showwarning("警告", "根目录不能为空。")
+            return
+        self.original_root=current_root
+
+
+    def _set_result_default(self):
+        """将当前输出目录设为默认值"""
+        current_result = self.result_dir_var.get().strip()
+        if not current_result:
+            messagebox.showwarning("警告", "输出目录不能为空。")
+            return
+        self.original_result=current_result
 
     # =================== 忽略目录管理 ===================
     def _refresh_ignore_checkboxes(self):

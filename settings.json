@@ -1,6 +1,6 @@
 {
-  "ROOT_DIR": "",
-  "RESULT_DIR": "",
+  "ROOT_DIR": "D:/Projects/SpringBoot/MatchIt_ClubSystem",
+  "RESULT_DIR": "C:/Users/slump/Desktop",
   "IGNORE_DIRS": [
     "node_modules",
     "dist",
