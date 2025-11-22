@@ -88,14 +88,22 @@ pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "set
 
 生成的可执行文件位于 `dist/` 目录中，可直接运行。
 
-##### MacOS
-在MacOS中,在终端执行:
-```bash
-pip install pyinstaller
-pyinstaller --noconsole --name "项目结构生成器" --add-data "settings.json:." --icon=static/app.icns __main__.py
-```
-打包好的可执行文件会在：
-`dist/项目结构生成器.app`
+[//]: # ()
+[//]: # (##### MacOS)
+
+[//]: # (在MacOS中,在终端执行:)
+
+[//]: # (```bash)
+
+[//]: # (pip install pyinstaller)
+
+[//]: # (pyinstaller --noconsole --name "项目结构生成器" --add-data "settings.json:." --icon=static/app.icns __main__.py)
+
+[//]: # (```)
+
+[//]: # (打包好的可执行文件会在：)
+
+[//]: # (`dist/项目结构生成器.app`)
 ## 许可协议
 
 本项目仅用于学习与研究目的，作者保留最终解释权。
