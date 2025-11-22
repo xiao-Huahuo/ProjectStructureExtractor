@@ -2,5 +2,4 @@ dist/
 build/
 *.spec
 __pycache__/
-settings.json
 outputs/
