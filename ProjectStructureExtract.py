@@ -1,68 +1,83 @@
 import os
+from enum import Enum, auto
 
+# ================== 数据结构定义 ==================
 
-# 目录下文件结构提取器
+class EntryType(Enum):
+    """文件系统条目的类型"""
+    DIRECTORY = auto()
+    FILE = auto()
+    BINARY_FILE = auto()  # 代表因扩展名被忽略的文件
+
+class FileSystemEntry:
+    """封装文件系统中的一个条目（文件或目录）"""
+    def __init__(self, path, entry_type, rel_path):
+        self.path = path          # 绝对路径
+        self.type = entry_type    # EntryType 枚举
+        self.rel_path = rel_path  # 从根目录开始的相对路径
+
+    def __repr__(self):
+        return f"FileSystemEntry(path='{self.path}', type='{self.type.name}')"
+
+# ================== 目录下文件结构提取器 ==================
+
 class Extractor:
     def __init__(self, root_dir, ignore_dirs=None, ignore_file_types=None):
         """
         初始化文件结构提取器。
 
         :param root_dir: 项目的根目录。
-        :param ignore_dirs: 一个包含需要忽略的目录名的列表 (例如: ['.idea', '__pycache__'])。
-        :param ignore_file_types: 一个包含需要忽略的文件扩展名的列表 (例如: ['.pyc', '.log'])。
+        :param ignore_dirs: 一个包含需要忽略的目录名的列表。
+        :param ignore_file_types: 一个包含需要忽略的文件扩展名的列表。
         """
         self.root_dir = root_dir
         self.result = []
-        # 将忽略目录列表转换为集合，提高查找效率，并处理None的情况
         self.ignore_dirs = set(ignore_dirs) if ignore_dirs else set()
-        # 将忽略文件类型列表转换为小写集合，方便后续匹配
-        # 注意：这里是文件扩展名，例如 '.pyc'
         self.ignore_file_types = set(ft.lower() for ft in ignore_file_types) if ignore_file_types else set()
-        return
 
-    # 提取根目录下所有的文件的全目录
     def extractProjectStructure(self):
-        self._recursiveExtractFileUtil(self.root_dir)
+        """
+        扫描根目录，返回一个包含 FileSystemEntry 对象的列表。
+        """
+        self._scan_directory(self.root_dir)
         return self.result
 
-    # 递归提取文件全目录,具有忽略目录和指定文件的功能
-    def _recursiveExtractFileUtil(self, curr_path):
-        # 1. 如果 curr_path 是一个文件
-        if os.path.isfile(curr_path):
-            # 获取文件的扩展名，并转换为小写
-            # os.path.splitext() 返回 (root, ext)，例如 ('file', '.txt')
-            ext = os.path.splitext(curr_path)[1].lower()
-
-            # 检查文件扩展名是否在忽略列表中
-            if ext in self.ignore_file_types:
-                return  # 忽略该文件
-
-            self.result.append(curr_path)  # 不在忽略列表，则添加文件
-            return
-
-        # 2. 如果 curr_path 是一个目录
-
-        # 检查当前目录名是否需要被忽略 (如果目录本身被传递进来，虽然在 extractProjectStructure 外部调用时应该避免，
-        # 但在递归调用时，目录路径通常是完整的，我们需要检查的是目录名)
-        curr_dir_name = os.path.basename(curr_path)
-        if curr_dir_name in self.ignore_dirs:
-            # 根目录本身不应该被忽略，所以这里主要针对的是子目录的递归调用
-            # 实际上，目录的忽略逻辑应该放在遍历父目录时进行，如下面的循环所示
-            pass
-
+    def _scan_directory(self, current_path):
+        """
+        递归扫描目录，填充 self.result 列表。
+        """
         try:
-            sub_paths = os.listdir(curr_path)
-        except OSError:
-            # 捕获权限错误或其他文件系统错误
+            # 遍历当前目录下的所有条目
+            for item_name in os.listdir(current_path):
+                full_path = os.path.join(current_path, item_name)
+                rel_path = os.path.relpath(full_path, self.root_dir)
+
+                # 判断是目录还是文件
+                if os.path.isdir(full_path):
+                    # 如果目录名在忽略列表中，则跳过
+                    if item_name in self.ignore_dirs:
+                        continue
+                    
+                    # 添加目录条目
+                    entry = FileSystemEntry(full_path, EntryType.DIRECTORY, rel_path)
+                    self.result.append(entry)
+                    
+                    # 递归进入子目录
+                    self._scan_directory(full_path)
+                
+                else: # 是文件
+                    # 检查文件扩展名
+                    ext = os.path.splitext(item_name)[1].lower()
+                    if ext in self.ignore_file_types:
+                        # 标记为二进制/被忽略文件
+                        entry = FileSystemEntry(full_path, EntryType.BINARY_FILE, rel_path)
+                    else:
+                        # 标记为普通文件
+                        entry = FileSystemEntry(full_path, EntryType.FILE, rel_path)
+                    
+                    self.result.append(entry)
+
+        except OSError as e:
+            # 捕获权限错误等问题
+            print(f"无法访问目录 {current_path}: {e}")
             return
-
-        for sub_path_name in sub_paths:
-            full_path = os.path.join(curr_path, sub_path_name)
-
-            # 检查是否是需要忽略的目录
-            if os.path.isdir(full_path) and sub_path_name in self.ignore_dirs:
-                continue  # 跳过整个目录的递归
-
-            # 递归调用处理子路径 (无论是文件还是目录)
-            self._recursiveExtractFileUtil(full_path)
-        return

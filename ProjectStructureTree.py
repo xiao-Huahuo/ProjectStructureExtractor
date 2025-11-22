@@ -1,53 +1,72 @@
-from ProjectStructureExtract import Extractor
+from ProjectStructureExtract import Extractor, FileSystemEntry, EntryType
 import os
 from pathlib import Path
-#项目结构树生成器
-class TreeBuilder:
-    def __init__(self,root_dir,ignore_dirs=None,ignore_file_types=None):
-        self.root_dir = root_dir
-        self.file_paths = Extractor(root_dir,ignore_dirs,ignore_file_types).extractProjectStructure() #获取全路径列表
-        self.ignore_dirs=ignore_dirs
-        self.ignore_file_types=ignore_file_types
-        return
 
-    # 生成目录树字符串（Markdown风格，含📁📄）并保存
-    def buildTree(self,filename):
+# 项目结构树生成器
+class TreeBuilder:
+    def __init__(self, root_dir, ignore_dirs=None, ignore_file_types=None):
+        self.root_dir = root_dir
+        # Extractor 现在返回 FileSystemEntry 对象列表
+        self.entries = Extractor(root_dir, ignore_dirs, ignore_file_types).extractProjectStructure()
+        self.ignore_dirs = ignore_dirs
+        self.ignore_file_types = ignore_file_types
+
+    def buildTree(self, filename):
+        """生成目录树字符串（Markdown风格）并保存"""
         tree = self._buildTreeDict()
-        tree_content= self._formatTree(tree, os.path.basename(self.root_dir) or self.root_dir)
-        path=Path(filename)
+        tree_content = self._formatTree(tree, os.path.basename(self.root_dir) or self.root_dir)
+        path = Path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(tree_content, encoding='utf-8')
         print(f"项目树结构已生成：{path.resolve()}.")
         return tree_content
 
-    # 构造嵌套字典形式的树结构
     def _buildTreeDict(self):
+        """使用 FileSystemEntry 列表构造嵌套字典形式的树结构"""
         tree = {}
-        for full_path in self.file_paths:
-            rel_path = os.path.relpath(full_path, self.root_dir)
-            parts = rel_path.split(os.sep)
+        for entry in self.entries:
+            parts = entry.rel_path.split(os.sep)
             current = tree
             for part in parts[:-1]:
                 current = current.setdefault(part, {})
-            current[parts[-1]] = {}
+            
+            # 最后一个部分，根据类型决定是文件还是目录
+            last_part = parts[-1]
+            if entry.type == EntryType.DIRECTORY:
+                current.setdefault(last_part, {})
+            else: # FILE or BINARY_FILE
+                current[last_part] = None  # 使用 None 来标记文件叶子节点
         return tree
 
-    # 递归格式化树为文本
-    def _formatTree(self, tree, root_name, prefix=""):
+    def _formatTree(self, tree, root_name):
+        """递归格式化树为文本"""
         output = f"📁 {root_name}/\n"
-        output += self._renderSubTree(tree, "│   ")
+        output += self._renderSubTree(tree, "")
         return output
 
-    def _renderSubTree(self, tree, indent=""):
+    def _renderSubTree(self, tree, prefix):
+        """
+        递归渲染子树。
+        - tree: 当前层的字典
+        - prefix: 用于连接线的前缀字符串
+        """
         lines = ""
-        entries = sorted(tree.items())
-        for i, (name, sub) in enumerate(entries):
-            connector = "└── " if i == len(entries) - 1 else "├── "
-            line_prefix = indent[:-4] + connector
-            if sub:
-                # 文件夹
-                lines += f"{line_prefix}📁 {name}/\n"
-                lines += self._renderSubTree(sub, indent + ("    " if i == len(entries) - 1 else "│   "))
-            else:
-                # 文件
-                lines += f"{line_prefix}📄 {name}\n"
+        # 对条目进行排序，确保目录总是在文件之前
+        entries = sorted(tree.items(), key=lambda item: (isinstance(item[1], dict), item[0]))
+        
+        for i, (name, sub_tree) in enumerate(entries):
+            is_last = (i == len(entries) - 1)
+            connector = "└── " if is_last else "├── "
+            
+            # 渲染当前行
+            lines += prefix + connector
+            
+            if isinstance(sub_tree, dict):  # 是目录
+                lines += f"📁 {name}/\n"
+                # 计算下一层的前缀
+                new_prefix = prefix + ("    " if is_last else "│   ")
+                lines += self._renderSubTree(sub_tree, new_prefix)
+            else:  # 是文件 (值为 None)
+                lines += f"📄 {name}\n"
+                
         return lines
