@@ -83,4 +83,5 @@ DEFAULT_SETTINGS = {
     ],
     "TREE_FILE": "project_tree.md",
     "CONTENT_FILE": "project_content.json",
+    "XML_FILE": "project_content.xml"
 }

@@ -21,7 +21,8 @@
 ![生成文件树](./static/tree.png)
 - 生成结构JSON
 ![生成结构JSON](./static/json.png)
-
+- 生成多行XML
+![生成多行XML](./static/xml.png)
 ## 项目结构
 
 ```
@@ -50,8 +51,8 @@
 
 1. 运行程序：
 
-   ```bash
-   python ProjectStructureGUI.py
+   ```shell
+   python __main__.py
    ```
 
 2. 在界面中：
@@ -61,11 +62,15 @@
    * (可选)可以将根目录或输出目录保存为默认值
    * 添加或移除忽略的文件夹
    * 修改需要忽略的文件后缀名
-   * 点击 “生成 JSON” 或 “生成 Tree” 按钮即可输出结果
+   * 点击 “生成 JSON” 或 "生成XML" 或 “生成 Tree” 按钮即可输出结果
+        - 生成JSON: 生成单行json,含有大量"\n"和"\\\\"转义符,适合机器读;
+        - 生成XML: 生成不含转义符的多行XML,适合人读;
+        - 生成Tree: 生成一个囊括了整个项目结构(包含二进制文件和空文件夹)的项目文件树的markdown格式文件.
 
 3. 程序将在输出目录中生成：
 
    * `project_content.json`
+   * `project_content.xml`
    * `project_tree.md`
 
 ### 视频教程
