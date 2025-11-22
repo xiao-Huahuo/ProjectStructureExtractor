@@ -37,47 +37,41 @@ class Extractor:
 
     def extractProjectStructure(self):
         """
-        扫描根目录，返回一个包含 FileSystemEntry 对象的列表。
-        """
-        self._scan_directory(self.root_dir)
-        return self.result
-
-    def _scan_directory(self, current_path):
-        """
-        递归扫描目录，填充 self.result 列表。
+        使用 os.walk() 以非递归方式扫描根目录，返回 FileSystemEntry 列表。
         """
         try:
-            # 遍历当前目录下的所有条目
-            for item_name in os.listdir(current_path):
-                full_path = os.path.join(current_path, item_name)
-                rel_path = os.path.relpath(full_path, self.root_dir)
-
-                # 判断是目录还是文件
-                if os.path.isdir(full_path):
-                    # 如果目录名在忽略列表中，则跳过
-                    if item_name in self.ignore_dirs:
-                        continue
-                    
-                    # 添加目录条目
-                    entry = FileSystemEntry(full_path, EntryType.DIRECTORY, rel_path)
-                    self.result.append(entry)
-                    
-                    # 递归进入子目录
-                    self._scan_directory(full_path)
+            for current_path, dir_names, file_names in os.walk(self.root_dir, topdown=True):
+                # --- 目录剪枝 (Pruning) ---
+                # topdown=True 模式下，可以就地修改 dir_names 列表，
+                # os.walk 将不会再进入被移除的目录。
+                # 我们创建一个新列表来存储不被忽略的目录
+                original_dirs = list(dir_names) # 备份原始列表用于添加条目
+                dir_names[:] = [d for d in dir_names if d not in self.ignore_dirs]
                 
-                else: # 是文件
-                    # 检查文件扩展名
-                    ext = os.path.splitext(item_name)[1].lower()
+                # --- 添加目录条目 ---
+                # 注意：os.walk 返回的 dir_names 是未被忽略的，但我们需要从原始列表中添加
+                for dir_name in original_dirs:
+                    # 只有当目录本身未被忽略时，才将其作为一个条目添加
+                    if dir_name not in self.ignore_dirs:
+                        full_path = os.path.join(current_path, dir_name)
+                        rel_path = os.path.relpath(full_path, self.root_dir)
+                        entry = FileSystemEntry(full_path, EntryType.DIRECTORY, rel_path)
+                        self.result.append(entry)
+
+                # --- 添加文件条目 ---
+                for file_name in file_names:
+                    full_path = os.path.join(current_path, file_name)
+                    rel_path = os.path.relpath(full_path, self.root_dir)
+                    
+                    ext = os.path.splitext(file_name)[1].lower()
                     if ext in self.ignore_file_types:
-                        # 标记为二进制/被忽略文件
                         entry = FileSystemEntry(full_path, EntryType.BINARY_FILE, rel_path)
                     else:
-                        # 标记为普通文件
                         entry = FileSystemEntry(full_path, EntryType.FILE, rel_path)
                     
                     self.result.append(entry)
 
         except OSError as e:
-            # 捕获权限错误等问题
-            print(f"无法访问目录 {current_path}: {e}")
-            return
+            print(f"无法访问或扫描目录 {self.root_dir}: {e}")
+
+        return self.result
