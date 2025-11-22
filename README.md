@@ -14,6 +14,7 @@
 * 生成json和xml时自动跳过二进制文件，防止读取异常
 * 所有配置项（包括默认路径与忽略目录/文件）均保存在 `settings.json` 中，可自动加载与保存
 * 新: 取消了递归函数的逻辑,使用`os.walk()`来进行非递归搜索,有效应对**深目录和深递归问题**.
+* 新: 新增"还原整个项目"逻辑,用户可根据之前生成的xml文件或者json文件还原整个项目(不含二进制文件,二进制文件会输出但是无法正常显示)
 
 ## 功能截图
 - 项目主界面
@@ -27,15 +28,32 @@
 ## 项目结构
 
 ```
-./
-├── JsonWriter.py              # JSON 文件写入器
-├── ProjectStructureExtract.py # 目录扫描器
-├── ProjectStructureTree.py    # 树形结构生成器
-├── ProjectStructureGUI.py     # 主图形界面程序
-├── globalConstants.py         # 全局常量定义
-├── settings.json              # 默认配置文件
-├── __main__.py                # 程序入口
-└── README.md                  # README文件
+📁 ProjectStructureExtractor/
+├── 📄 .gitignore
+├── 📄 JsonWriter.py
+├── 📄 ProjectRestorer.py
+├── 📄 ProjectStructureExtract.py
+├── 📄 ProjectStructureGUI.py
+├── 📄 ProjectStructureTree.py
+├── 📄 README.md
+├── 📄 XmlWriter.py
+├── 📄 __main__.py
+├── 📄 defaultSettings.py
+├── 📄 settings.json
+├── 📁 .vs/
+│   ├── 📄 ProjectSettings.json
+│   ├── 📄 VSWorkspaceState.json
+│   ├── 📄 slnx.sqlite
+│   └── 📁 ProjectStructureExtractor/
+│       └── 📁 FileContentIndex/
+│           └── 📄 7397c841-f4a1-4518-bdde-2969a4986b16.vsidx
+└── 📁 static/
+    ├── 📄 app.ico
+    ├── 📄 base.png
+    ├── 📄 json.png
+    ├── 📄 tree.png
+    └── 📄 xml.png
+
 ```
 
 ## 运行环境
@@ -64,20 +82,13 @@
    * 添加或移除忽略的文件夹
    * 修改需要忽略的文件后缀名
    * 点击 “生成 JSON” 或 "生成XML" 或 “生成 Tree” 按钮即可输出结果
+   * 点击 "还原项目" 并置入项目json或xml,选择输出目录,即可还原二进制文件外的整个项目
 
 3. 程序将在输出目录中生成：
 
    * `project_content.json`
    * `project_content.xml`
    * `project_tree.md`
-
-### 视频教程
-
-<video src="./static/使用方法.mp4" controls width="600" height="400">
-  您的浏览器不支持播放该视频。请下载 [使用方法.mp4](./static/使用方法.mp4) 进行观看。
-</video>
-
-或者您可以直接点击链接下载：[使用方法.mp4](./static/使用方法.mp4)
 
 ## 打包为可执行程序
 
