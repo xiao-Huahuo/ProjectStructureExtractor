@@ -30,13 +30,21 @@ def get_system_theme():
         pass
     return "light"
 
+def resource_path(relative_path):
+    """获取资源的绝对路径，兼容开发模式和 PyInstaller 打包后的模式"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 class ProjectStructureApp:
     def __init__(self):
         self.settings = self._load_settings()
         self.root = ttk.Window(themename=self.settings.get("THEME", "litera"))
         
         self.root.title("📁 项目结构生成器")
-        self.root.geometry("880x550")
+        self.root.geometry("880x580")
         self.root.resizable(True, False)
 
         self.default_root_dir = self.settings["ROOT_DIR"]
@@ -100,6 +108,9 @@ class ProjectStructureApp:
         header_frame = ttk.Frame(self.root)
         header_frame.pack(pady=10, padx=20, fill="x")
         ttk.Label(header_frame, text="项目结构生成器", font=("微软雅黑", 18, "bold")).pack(side="left", expand=True)
+        
+        help_btn = ttk.Button(header_frame, text="❓", command=self._show_help_window, bootstyle="secondary-outline")
+        help_btn.pack(side="right", padx=5)
         self.theme_toggle_btn = ttk.Button(header_frame, text="🌙" if self.root.style.theme.name == "litera" else "☀️", command=self._toggle_theme, bootstyle="secondary-outline")
         self.theme_toggle_btn.pack(side="right")
         
@@ -113,7 +124,7 @@ class ProjectStructureApp:
         ttk.Button(frame, text="设为默认", command=self._set_root_default, bootstyle="secondary-outline").grid(row=0, column=3, padx=5)
         self.root_recent_menu = ttk.Menu(self.root, tearoff=0)
         self.root_recent_btn = ttk.Menubutton(frame, text="最近", menu=self.root_recent_menu, bootstyle="secondary-outline")
-        self.root_recent_btn.grid(row=0, column=4)
+        self.root_recent_btn.grid(row=0, column=4, padx=5)
 
         ttk.Label(frame, text="输出目录:").grid(row=1, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=self.result_dir_var).grid(row=1, column=1, padx=5, sticky="ew")
@@ -121,7 +132,7 @@ class ProjectStructureApp:
         ttk.Button(frame, text="设为默认", command=self._set_result_default, bootstyle="secondary-outline").grid(row=1, column=3, padx=5)
         self.result_recent_menu = ttk.Menu(self.root, tearoff=0)
         self.result_recent_btn = ttk.Menubutton(frame, text="最近", menu=self.result_recent_menu, bootstyle="secondary-outline")
-        self.result_recent_btn.grid(row=1, column=4)
+        self.result_recent_btn.grid(row=1, column=4, padx=5)
 
         ignore_main_frame = ttk.Frame(self.root)
         ignore_main_frame.pack(padx=20, pady=10, fill="both", expand=True)
@@ -135,8 +146,11 @@ class ProjectStructureApp:
         ttk.Button(btn_frame, text="生成 XML", width=12, command=self._generate_xml, bootstyle="primary").grid(row=0, column=1, padx=5)
         ttk.Button(btn_frame, text="生成 Tree", width=12, command=self._generate_tree, bootstyle="info").grid(row=0, column=2, padx=5)
         ttk.Button(btn_frame, text="还原项目", width=12, command=self._restore_project, bootstyle="danger").grid(row=0, column=3, padx=5)
+        ttk.Button(btn_frame, text="重置设置", width=12, command=self._reset_to_default_settings, bootstyle="warning-outline").grid(row=0, column=4, padx=5)
         
-        ttk.Separator(self.root, orient="horizontal").pack(fill='x', padx=20)
+        self.progress_bar = ttk.Progressbar(self.root, mode='indeterminate')
+        self.progress_bar.pack(fill='x', padx=20, pady=(0, 5))
+        
         self.status_var = ttk.StringVar(value="等待操作中...")
         ttk.Label(self.root, textvariable=self.status_var, anchor="w").pack(side="bottom", fill="x", padx=20, pady=5)
 
@@ -248,10 +262,13 @@ class ProjectStructureApp:
 
     def _execute_and_log(self, action_name, action_func):
         params = self._get_common_generation_params()
-        if not params[0]: return None, []
+        if not params or not params[0]: return None, []
         
         root_dir, result_dir, ignores, ignore_types = params
         start_time = time.time()
+        
+        self.progress_bar.start(10)
+        self.root.update_idletasks()
         
         try:
             stats, *other_results = action_func()
@@ -269,21 +286,19 @@ class ProjectStructureApp:
         except Exception as e:
             duration = round(time.time() - start_time, 2)
             
-            error_stats = {
-                'duration': duration,
-                'status': 'error',
-                'message': str(e)
-            }
+            error_stats = { 'duration': duration, 'status': 'error', 'message': str(e) }
             log_action(action_name, root_dir, result_dir, ignores, ignore_types, error_stats)
             self._update_recent_menus()
             
             messagebox.showerror("错误", f"执行 '{action_name}' 时出错：\n{e}")
             self.status_var.set(f"❌ 执行 '{action_name}' 失败")
             return None, []
+        finally:
+            self.progress_bar.stop()
 
     def _generate_json(self):
         params = self._get_common_generation_params()
-        if not params[0]: return
+        if not params or not params[0]: return
         root_dir, result_dir, ignores, ignore_file_types = params
         
         def action():
@@ -300,7 +315,7 @@ class ProjectStructureApp:
 
     def _generate_xml(self):
         params = self._get_common_generation_params()
-        if not params[0]: return
+        if not params or not params[0]: return
         root_dir, result_dir, ignores, ignore_file_types = params
 
         def action():
@@ -314,9 +329,18 @@ class ProjectStructureApp:
             self.status_var.set(f"✅ XML 已生成: {result_path} (耗时: {stats['duration']}s)")
             messagebox.showinfo("成功", f"XML 文件生成成功！\n{result_path}")
 
+    def _show_tree_window(self, content):
+        win = ttk.Toplevel(self.root)
+        win.title("📂 目录树预览")
+        win.geometry("700x600")
+        text_area = ScrolledText(win, wrap="none", font=("Consolas", 10), autohide=True)
+        text_area.insert('end', content)
+        text_area.text.configure(state="disabled")
+        text_area.pack(fill="both", expand=True, padx=10, pady=10)
+
     def _generate_tree(self):
         params = self._get_common_generation_params()
-        if not params[0]: return
+        if not params or not params[0]: return
         root_dir, result_dir, ignores, ignore_file_types = params
 
         def action():
@@ -352,14 +376,32 @@ class ProjectStructureApp:
             self.status_var.set(f"✅ {Path(source_file).name} 已成功还原！ (耗时: {stats['duration']}s)")
             messagebox.showinfo("成功", message)
 
-    def _show_tree_window(self, content):
+    def _show_help_window(self):
+        try:
+            readme_path = resource_path("README.md")
+            with open(readme_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            content = "错误：未找到 README.md 文件。"
+        
         win = ttk.Toplevel(self.root)
-        win.title("📂 目录树预览")
-        win.geometry("700x600")
-        text_area = ScrolledText(win, wrap="none", font=("Consolas", 10), autohide=True)
+        win.title("❓ 帮助文档")
+        win.geometry("800x600")
+        
+        text_area = ScrolledText(win, wrap="word", font=("微软雅黑", 10), autohide=True, padding=10)
         text_area.insert('end', content)
         text_area.text.configure(state="disabled")
-        text_area.pack(fill="both", expand=True, padx=10, pady=10)
+        text_area.pack(fill="both", expand=True)
+
+    def _reset_to_default_settings(self):
+        if messagebox.askyesno("确认重置", "您确定要将所有设置恢复为默认值吗？\n此操作将删除当前配置并需要重启应用。"):
+            try:
+                if os.path.exists(SETTINGS_FILE):
+                    os.remove(SETTINGS_FILE)
+                messagebox.showinfo("操作成功", "设置已重置。请重新启动应用程序。")
+                self.root.destroy()
+            except Exception as e:
+                messagebox.showerror("错误", f"重置设置时出错：\n{e}")
 
     def _on_close(self):
         self._save_settings()
