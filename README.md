@@ -60,12 +60,8 @@
 
 * Python 3.9 及以上版本
 * 依赖库：
-
-  ```bash
-  pip install tkinter
-  ```
-  （部分 Python 环境已自带 tkinter）
-
+  - `tkinter`
+  - `ttkbootstrap`
 ## 使用方法
 
 1. 运行程序：
@@ -104,8 +100,8 @@ pyinstaller --noconsole --onefile --name "项目结构生成器" --add-data "set
 将生成的exe文件放入指定文件夹(运行时同级会出现settings.json),然后在桌面上创建一个exe文件的快捷方式即可.
 
 ## 未来展望
-- [ ] 美化: 
-  - 将tkinter的UI和界面美化为蓝白色.
+- [x] 美化: 
+  - 使用`ttkbootstrap`库,将tkinter的UI和界面美化为蓝白色(亮色)/蓝黑色(暗色).
   - 右上角添加一个小灯泡,进行明暗切换功能。
 - [ ] 将忽略目录的复选框和输入框改为和忽略的文件类型相同的多行编辑器
 - [ ] 最近使用项目: 在两个目录的右边两个按钮右边再加上一个"最近使用",点击后列出用户最近使用的目录,用户点击记录即可直接填充路径.(最近使用项目应该记录在history.json里面)

@@ -7,7 +7,7 @@ class EntryType(Enum):
     """文件系统条目的类型"""
     DIRECTORY = auto()
     FILE = auto()
-    BINARY_FILE = auto()  # 代表因扩展名被忽略的文件
+    BINARY_FILE = auto()  # 代表因扩展名被忽略或内容被检测为二进制的文件
 
 class FileSystemEntry:
     """封装文件系统中的一个条目（文件或目录）"""
@@ -18,6 +18,21 @@ class FileSystemEntry:
 
     def __repr__(self):
         return f"FileSystemEntry(path='{self.path}', type='{self.type.name}')"
+
+# ================== 辅助函数 ==================
+
+def is_binary(file_path):
+    """
+    通过读取文件的前2048个字节并检查是否存在空字节来判断文件是否为二进制文件。
+    这是一种高效的启发式检测方法。
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            chunk = f.read(2048)
+            return b'\x00' in chunk
+    except Exception:
+        # 如果文件无法读取（例如权限问题），也将其视为二进制以避免后续处理
+        return True
 
 # ================== 目录下文件结构提取器 ==================
 
@@ -42,16 +57,11 @@ class Extractor:
         try:
             for current_path, dir_names, file_names in os.walk(self.root_dir, topdown=True):
                 # --- 目录剪枝 (Pruning) ---
-                # topdown=True 模式下，可以就地修改 dir_names 列表，
-                # os.walk 将不会再进入被移除的目录。
-                # 我们创建一个新列表来存储不被忽略的目录
-                original_dirs = list(dir_names) # 备份原始列表用于添加条目
+                original_dirs = list(dir_names)
                 dir_names[:] = [d for d in dir_names if d not in self.ignore_dirs]
                 
                 # --- 添加目录条目 ---
-                # 注意：os.walk 返回的 dir_names 是未被忽略的，但我们需要从原始列表中添加
                 for dir_name in original_dirs:
-                    # 只有当目录本身未被忽略时，才将其作为一个条目添加
                     if dir_name not in self.ignore_dirs:
                         full_path = os.path.join(current_path, dir_name)
                         rel_path = os.path.relpath(full_path, self.root_dir)
@@ -64,7 +74,12 @@ class Extractor:
                     rel_path = os.path.relpath(full_path, self.root_dir)
                     
                     ext = os.path.splitext(file_name)[1].lower()
-                    if ext in self.ignore_file_types:
+                    
+                    # 核心逻辑修改：
+                    # 1. 扩展名在忽略列表中
+                    # 2. 或者文件内容被检测为二进制
+                    # 满足任一条件，即视为二进制文件
+                    if ext in self.ignore_file_types or is_binary(full_path):
                         entry = FileSystemEntry(full_path, EntryType.BINARY_FILE, rel_path)
                     else:
                         entry = FileSystemEntry(full_path, EntryType.FILE, rel_path)

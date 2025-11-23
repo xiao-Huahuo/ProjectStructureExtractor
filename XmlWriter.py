@@ -1,7 +1,16 @@
 from ProjectStructureExtract import Extractor, EntryType
 from pathlib import Path
 import os
+import re
 from xml.sax.saxutils import escape
+
+# 定义一个正则表达式，用于匹配所有不符合 XML 1.0 规范的字符
+# 包括大部分 C0 和 C1 控制字符，但不包括 \t, \n, \r
+_illegal_xml_chars_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f]')
+
+def _strip_illegal_xml_chars(s):
+    """从字符串中移除所有非法的XML字符"""
+    return _illegal_xml_chars_re.sub('', s)
 
 class XmlWriter:
     def __init__(self, root_dir, ignore_dirs=None, ignore_file_types=None):
@@ -19,7 +28,6 @@ class XmlWriter:
             
             file_count += 1
             
-            # 清理路径中的不间断空格
             rel_path_posix = entry.rel_path.replace(os.sep, '/').replace('\u00A0', ' ')
             escaped_path = escape(rel_path_posix)
 
@@ -29,16 +37,17 @@ class XmlWriter:
             elif entry.type == EntryType.FILE:
                 path = Path(entry.path)
                 try:
-                    # 读取内容后，立刻清理不间断空格
-                    content = path.read_text(encoding='utf-8').replace('\u00A0', ' ')
+                    raw_content = path.read_text(encoding='utf-8')
                 except UnicodeDecodeError:
                     try:
-                        # 修正此处的拼写错误
-                        content = path.read_text(encoding='gbk').replace('\u00A0', ' ')
+                        raw_content = path.read_text(encoding='gbk')
                     except UnicodeDecodeError:
-                        content = path.read_text(encoding='utf-8', errors='ignore').replace('\u00A0', ' ')
+                        raw_content = path.read_text(encoding='utf-8', errors='ignore')
                 except Exception as e:
-                    content = f"Error reading file: {e}"
+                    raw_content = f"Error reading file: {e}"
+                
+                # 在这里进行“消毒”，移除所有非法字符
+                content = _strip_illegal_xml_chars(raw_content)
             
             # 手动为属性值添加引号
             xml_parts.append(f'  <file path="{escaped_path}">\n')
