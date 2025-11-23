@@ -1,11 +1,10 @@
 import ttkbootstrap as ttk
 from ttkbootstrap.scrolled import ScrolledText, ScrolledFrame
 from tkinter import filedialog, messagebox
-from ProjectStructureExtract import Extractor
-from JsonWriter import Writer
+from utils.JsonWriter import Writer
 from XmlWriter import XmlWriter
-from ProjectStructureTree import TreeBuilder
-from ProjectRestorer import ProjectRestorer
+from utils.ProjectStructureTree import TreeBuilder
+from utils.ProjectRestorer import ProjectRestorer
 from pathlib import Path
 import json
 import os
