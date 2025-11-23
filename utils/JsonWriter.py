@@ -1,21 +1,20 @@
-from utils.ProjectStructureExtract import Extractor, EntryType
+from utils.ProjectStructureExtract import EntryType
 from pathlib import Path
 import json
 import os
 
 class Writer:
-    def __init__(self, root_dir, ignore_dirs=None, ignore_file_types=None):
-        self.root_dir = root_dir
-        self.entries = Extractor(root_dir, ignore_dirs, ignore_file_types).extractProjectStructure()
+    def __init__(self):
         self.contents = {}
 
-    def updateFile(self, filename):
+    def updateFile(self, filename, entries_generator):
         """
-        根据条目类型处理并生成 JSON 文件，并返回统计信息。
+        根据条目生成器处理并生成 JSON 文件，并返回统计信息。
         """
         file_count = 0
         dir_count = 0
-        for entry in self.entries:
+        
+        for entry, progress in entries_generator:
             if entry.type == EntryType.DIRECTORY:
                 dir_count += 1
                 continue
@@ -37,6 +36,9 @@ class Writer:
                     content = f"Error reading file: {e}"
 
             self.contents[entry.rel_path] = content
+            
+            # Yield progress back to the caller
+            yield progress
 
         goal_file = Path(filename)
         goal_file.parent.mkdir(parents=True, exist_ok=True)
@@ -47,4 +49,6 @@ class Writer:
         
         stats = {"files": file_count, "dirs": dir_count}
         print(f"JSON 文件已生成：{goal_file.resolve()}，共 {file_count} 个文件。")
-        return stats
+        
+        # Final yield with stats
+        yield stats

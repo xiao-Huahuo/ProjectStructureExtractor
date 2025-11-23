@@ -1,4 +1,4 @@
-from utils.ProjectStructureExtract import Extractor, EntryType
+from utils.ProjectStructureExtract import EntryType
 from pathlib import Path
 import os
 import re
@@ -10,16 +10,16 @@ def _strip_illegal_xml_chars(s):
     return _illegal_xml_chars_re.sub('', s)
 
 class XmlWriter:
-    def __init__(self, root_dir, ignore_dirs=None, ignore_file_types=None):
-        self.root_dir = root_dir
-        self.entries = Extractor(root_dir, ignore_dirs, ignore_file_types).extractProjectStructure()
+    def __init__(self):
+        pass
 
-    def updateFile(self, filename):
+    def updateFile(self, filename, entries_generator):
         xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n', '<project>\n']
 
         file_count = 0
         dir_count = 0
-        for entry in self.entries:
+        
+        for entry, progress in entries_generator:
             if entry.type == EntryType.DIRECTORY:
                 dir_count += 1
                 continue
@@ -54,6 +54,8 @@ class XmlWriter:
                 xml_parts.append(f'    <content><![CDATA[{content}]]></content>\n')
             
             xml_parts.append(f'  </file>\n')
+            
+            yield progress
 
         xml_parts.append('</project>\n')
         
@@ -65,4 +67,4 @@ class XmlWriter:
 
         stats = {"files": file_count, "dirs": dir_count}
         print(f"XML 文件已生成：{goal_file.resolve()}，共 {file_count} 个文件。")
-        return stats
+        yield stats

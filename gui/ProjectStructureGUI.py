@@ -6,6 +6,7 @@ from utils.XmlWriter import XmlWriter
 from utils.ProjectStructureTree import TreeBuilder
 from utils.ProjectRestorer import ProjectRestorer
 from utils.HistoryLogger import log_action, read_recent_paths
+from utils.ProjectStructureExtract import Extractor
 from pathlib import Path
 import json
 import os
@@ -31,7 +32,6 @@ def get_system_theme():
     return "light"
 
 def resource_path(relative_path):
-    """获取资源的绝对路径，兼容开发模式和 PyInstaller 打包后的模式"""
     try:
         base_path = sys._MEIPASS
     except Exception:
@@ -148,7 +148,7 @@ class ProjectStructureApp:
         ttk.Button(btn_frame, text="还原项目", width=12, command=self._restore_project, bootstyle="danger").grid(row=0, column=3, padx=5)
         ttk.Button(btn_frame, text="重置设置", width=12, command=self._reset_to_default_settings, bootstyle="warning-outline").grid(row=0, column=4, padx=5)
         
-        self.progress_bar = ttk.Progressbar(self.root, mode='indeterminate')
+        self.progress_bar = ttk.Progressbar(self.root, mode='determinate')
         self.progress_bar.pack(fill='x', padx=20, pady=(0, 5))
         
         self.status_var = ttk.StringVar(value="等待操作中...")
@@ -260,21 +260,40 @@ class ProjectStructureApp:
         
         return root_dir, result_dir, active_ignore_dirs, active_ignore_types
 
-    def _execute_and_log(self, action_name, action_func):
+    def _execute_and_log(self, action_name, action_func, is_generator=False):
         params = self._get_common_generation_params()
         if not params or not params[0]: return None, []
         
         root_dir, result_dir, ignores, ignore_types = params
         start_time = time.time()
         
-        self.progress_bar.start(10)
-        self.root.update_idletasks()
-        
         try:
-            stats, *other_results = action_func()
-            duration = round(time.time() - start_time, 2)
+            extractor = Extractor(root_dir, ignores, ignore_types)
             
-            if stats is None: stats = {}
+            self.status_var.set("正在计算文件总数...")
+            self.progress_bar.config(mode='indeterminate')
+            self.progress_bar.start(10)
+            self.root.update_idletasks()
+            
+            extractor.count_items()
+            
+            self.progress_bar.stop()
+            self.progress_bar.config(mode='determinate')
+            self.status_var.set("正在处理文件...")
+            
+            stats = {}
+            other_results = []
+            
+            # The action_func is now a generator
+            action_generator = action_func(extractor.extract_project_structure())
+            for result in action_generator:
+                if isinstance(result, (int, float)):
+                    self.progress_bar['value'] = result
+                    self.root.update_idletasks()
+                else:
+                    stats, *other_results = result
+
+            duration = round(time.time() - start_time, 2)
             stats['duration'] = duration
             stats['status'] = 'success'
             
@@ -285,7 +304,6 @@ class ProjectStructureApp:
 
         except Exception as e:
             duration = round(time.time() - start_time, 2)
-            
             error_stats = { 'duration': duration, 'status': 'error', 'message': str(e) }
             log_action(action_name, root_dir, result_dir, ignores, ignore_types, error_stats)
             self._update_recent_menus()
@@ -295,19 +313,25 @@ class ProjectStructureApp:
             return None, []
         finally:
             self.progress_bar.stop()
+            self.progress_bar['value'] = 0
 
     def _generate_json(self):
         params = self._get_common_generation_params()
         if not params or not params[0]: return
-        root_dir, result_dir, ignores, ignore_file_types = params
         
-        def action():
-            writer = Writer(root_dir, ignores, ignore_file_types)
-            result_path = Path(result_dir) / self.content_file
-            stats = writer.updateFile(result_path)
-            return stats, result_path
+        def action(entries_generator):
+            writer = Writer()
+            result_path = Path(params[1]) / self.content_file
+            # This is now a generator, so we need to exhaust it
+            final_stats = None
+            for result in writer.updateFile(result_path, entries_generator):
+                if isinstance(result, (int, float)):
+                    yield result
+                else:
+                    final_stats = result
+            yield final_stats, result_path
 
-        stats, results = self._execute_and_log("generate_json", action)
+        stats, results = self._execute_and_log("generate_json", action, is_generator=True)
         if stats and stats.get('status') == 'success':
             result_path = results[0]
             self.status_var.set(f"✅ JSON 已生成: {result_path} (耗时: {stats['duration']}s)")
@@ -316,18 +340,83 @@ class ProjectStructureApp:
     def _generate_xml(self):
         params = self._get_common_generation_params()
         if not params or not params[0]: return
-        root_dir, result_dir, ignores, ignore_file_types = params
 
-        def action():
-            writer = XmlWriter(root_dir, ignores, ignore_file_types)
-            result_path = Path(result_dir) / self.xml_file
-            return writer.updateFile(result_path), result_path
+        def action(entries_generator):
+            writer = XmlWriter()
+            result_path = Path(params[1]) / self.xml_file
+            final_stats = None
+            for result in writer.updateFile(result_path, entries_generator):
+                if isinstance(result, (int, float)):
+                    yield result
+                else:
+                    final_stats = result
+            yield final_stats, result_path
 
-        stats, results = self._execute_and_log("generate_xml", action)
+        stats, results = self._execute_and_log("generate_xml", action, is_generator=True)
         if stats and stats.get('status') == 'success':
             result_path = results[0]
             self.status_var.set(f"✅ XML 已生成: {result_path} (耗时: {stats['duration']}s)")
             messagebox.showinfo("成功", f"XML 文件生成成功！\n{result_path}")
+
+    def _generate_tree(self):
+        params = self._get_common_generation_params()
+        if not params or not params[0]: return
+
+        def action(entries_generator):
+            builder = TreeBuilder()
+            result_path = Path(params[1]) / self.tree_file
+            final_stats, content = None, None
+            for result in builder.buildTree(result_path, entries_generator):
+                if isinstance(result, (int, float)):
+                    yield result
+                else:
+                    final_stats, content = result
+            yield final_stats, content
+
+        stats, results = self._execute_and_log("generate_tree", action, is_generator=True)
+        if stats and stats.get('status') == 'success':
+            content = results[0]
+            self.status_var.set(f"✅ 目录树已生成 (耗时: {stats['duration']}s)")
+            self._show_tree_window(content)
+
+    def _restore_project(self):
+        # Restore project does not use the two-pass scanner, so it's handled differently
+        source_file = filedialog.askopenfilename(title="选择要还原的 JSON 或 XML 文件", filetypes=[("Project Files", "*.json *.xml"), ("All files", "*.*")])
+        if not source_file: return
+        target_root = filedialog.askdirectory(title="选择要将项目还原到的目录")
+        if not target_root: return
+        
+        self.status_var.set("正在还原项目...")
+        self.progress_bar.start(10)
+        self.root.update_idletasks()
+        
+        start_time = time.time()
+        try:
+            restorer = ProjectRestorer(source_file, target_root)
+            success, message, stats = restorer.restore()
+            if not success:
+                raise Exception(message)
+
+            duration = round(time.time() - start_time, 2)
+            stats['duration'] = duration
+            stats['status'] = 'success'
+            
+            # Manually log this action as it doesn't fit the standard generator pattern
+            log_action("restore_project", "N/A", target_root, [], [], stats)
+            self._update_recent_menus()
+
+            self.status_var.set(f"✅ {Path(source_file).name} 已成功还原！ (耗时: {stats['duration']}s)")
+            messagebox.showinfo("成功", message)
+
+        except Exception as e:
+            duration = round(time.time() - start_time, 2)
+            error_stats = { 'duration': duration, 'status': 'error', 'message': str(e) }
+            log_action("restore_project", "N/A", target_root, [], [], error_stats)
+            self._update_recent_menus()
+            messagebox.showerror("错误", f"执行 'restore_project' 时出错：\n{e}")
+            self.status_var.set(f"❌ 执行 'restore_project' 失败")
+        finally:
+            self.progress_bar.stop()
 
     def _show_tree_window(self, content):
         win = ttk.Toplevel(self.root)
@@ -337,44 +426,6 @@ class ProjectStructureApp:
         text_area.insert('end', content)
         text_area.text.configure(state="disabled")
         text_area.pack(fill="both", expand=True, padx=10, pady=10)
-
-    def _generate_tree(self):
-        params = self._get_common_generation_params()
-        if not params or not params[0]: return
-        root_dir, result_dir, ignores, ignore_file_types = params
-
-        def action():
-            tree = TreeBuilder(root_dir, ignores, ignore_file_types)
-            result_path = Path(result_dir) / self.tree_file
-            return tree.buildTree(result_path)
-
-        stats, results = self._execute_and_log("generate_tree", action)
-        if stats and stats.get('status') == 'success':
-            content = results[0]
-            self.status_var.set(f"✅ 目录树已生成 (耗时: {stats['duration']}s)")
-            self._show_tree_window(content)
-
-    def _restore_project(self):
-        source_file = filedialog.askopenfilename(title="选择要还原的 JSON 或 XML 文件", filetypes=[("Project Files", "*.json *.xml"), ("All files", "*.*")])
-        if not source_file: return
-        target_root = filedialog.askdirectory(title="选择要将项目还原到的目录")
-        if not target_root: return
-        
-        self.status_var.set("正在还原项目...")
-        self.root.update_idletasks()
-        
-        def action():
-            restorer = ProjectRestorer(source_file, target_root)
-            success, message, stats = restorer.restore()
-            if not success:
-                raise Exception(message)
-            return stats, message
-        
-        stats, results = self._execute_and_log("restore_project", action)
-        if stats and stats.get('status') == 'success':
-            message = results[0]
-            self.status_var.set(f"✅ {Path(source_file).name} 已成功还原！ (耗时: {stats['duration']}s)")
-            messagebox.showinfo("成功", message)
 
     def _show_help_window(self):
         try:
