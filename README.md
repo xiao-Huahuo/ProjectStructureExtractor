@@ -30,29 +30,23 @@
 ```
 📁 ProjectStructureExtractor/
 ├── 📄 .gitignore
-├── 📄 JsonWriter.py
-├── 📄 ProjectRestorer.py
-├── 📄 ProjectStructureExtract.py
-├── 📄 ProjectStructureGUI.py
-├── 📄 ProjectStructureTree.py
 ├── 📄 README.md
-├── 📄 XmlWriter.py
 ├── 📄 __main__.py
-├── 📄 defaultSettings.py
 ├── 📄 settings.json
-├── 📁 .vs/
-│   ├── 📄 ProjectSettings.json
-│   ├── 📄 VSWorkspaceState.json
-│   ├── 📄 slnx.sqlite
-│   └── 📁 ProjectStructureExtractor/
-│       └── 📁 FileContentIndex/
-│           └── 📄 7397c841-f4a1-4518-bdde-2969a4986b16.vsidx
-└── 📁 static/
-    ├── 📄 app.ico
-    ├── 📄 base.png
-    ├── 📄 json.png
-    ├── 📄 tree.png
-    └── 📄 xml.png
+├── 📁 configure/
+│   ├── 📄 __init__.py
+│   └── 📄 defaultSettings.py
+├── 📁 gui/
+│   ├── 📄 ProjectStructureGUI.py
+│   └── 📄 __init__.py
+├── 📁 static/
+└── 📁 utils/
+    ├── 📄 JsonWriter.py
+    ├── 📄 ProjectRestorer.py
+    ├── 📄 ProjectStructureExtract.py
+    ├── 📄 ProjectStructureTree.py
+    ├── 📄 XmlWriter.py
+    └── 📄 __init__.py
 
 ```
 
