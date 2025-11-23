@@ -1,4 +1,4 @@
-from ProjectStructureExtract import Extractor, EntryType
+from utils.ProjectStructureExtract import Extractor, EntryType
 from pathlib import Path
 import os
 import re
