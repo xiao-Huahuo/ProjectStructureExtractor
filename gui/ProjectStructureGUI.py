@@ -1,15 +1,17 @@
 import ttkbootstrap as ttk
-from ttkbootstrap.scrolled import ScrolledText, ScrolledFrame
+from ttkbootstrap.scrolled import ScrolledFrame, ScrolledText
 from tkinter import filedialog, messagebox
 from utils.JsonWriter import Writer
 from utils.XmlWriter import XmlWriter
 from utils.ProjectStructureTree import TreeBuilder
 from utils.ProjectRestorer import ProjectRestorer
+from utils.HistoryLogger import log_action, read_recent_paths
 from pathlib import Path
 import json
 import os
 import sys
 import subprocess
+import time
 from configure.defaultSettings import *
 
 def get_system_theme():
@@ -52,6 +54,7 @@ class ProjectStructureApp:
         self.result_dir_var = ttk.StringVar(value=self.settings["RESULT_DIR"])
 
         self._build_ui()
+        self._update_recent_menus()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.mainloop()
 
@@ -108,11 +111,17 @@ class ProjectStructureApp:
         ttk.Entry(frame, textvariable=self.root_dir_var).grid(row=0, column=1, padx=5, sticky="ew")
         ttk.Button(frame, text="选择", command=self._choose_root_dir, bootstyle="secondary-outline").grid(row=0, column=2)
         ttk.Button(frame, text="设为默认", command=self._set_root_default, bootstyle="secondary-outline").grid(row=0, column=3, padx=5)
-        
+        self.root_recent_menu = ttk.Menu(self.root, tearoff=0)
+        self.root_recent_btn = ttk.Menubutton(frame, text="最近", menu=self.root_recent_menu, bootstyle="secondary-outline")
+        self.root_recent_btn.grid(row=0, column=4)
+
         ttk.Label(frame, text="输出目录:").grid(row=1, column=0, sticky="w", pady=5)
         ttk.Entry(frame, textvariable=self.result_dir_var).grid(row=1, column=1, padx=5, sticky="ew")
         ttk.Button(frame, text="选择", command=self._choose_result_dir, bootstyle="secondary-outline").grid(row=1, column=2)
         ttk.Button(frame, text="设为默认", command=self._set_result_default, bootstyle="secondary-outline").grid(row=1, column=3, padx=5)
+        self.result_recent_menu = ttk.Menu(self.root, tearoff=0)
+        self.result_recent_btn = ttk.Menubutton(frame, text="最近", menu=self.result_recent_menu, bootstyle="secondary-outline")
+        self.result_recent_btn.grid(row=1, column=4)
 
         ignore_main_frame = ttk.Frame(self.root)
         ignore_main_frame.pack(padx=20, pady=10, fill="both", expand=True)
@@ -147,12 +156,34 @@ class ProjectStructureApp:
         
         var_dict.clear()
         for item in item_list:
-            var = ttk.BooleanVar(value=True)
-            var_dict[item] = var
-            cb = ttk.Checkbutton(scroll_frame, text=item, variable=var, bootstyle="round-toggle")
-            cb.pack(anchor="w", padx=15, pady=5, fill='x')
+            self._add_ignore_checkbox(item, item_list, var_dict, scroll_frame)
         
         return scroll_frame
+
+    def _add_ignore_checkbox(self, item, item_list, var_dict, scroll_frame):
+        row_frame = ttk.Frame(scroll_frame)
+        row_frame.pack(fill='x', pady=2)
+
+        var = ttk.BooleanVar(value=True)
+        var_dict[item] = var
+        
+        cb = ttk.Checkbutton(row_frame, text=item, variable=var, bootstyle="round-toggle")
+        cb.pack(side="left", padx=(15, 0), fill='x', expand=True)
+
+        delete_btn = ttk.Button(row_frame, text="❌", bootstyle="danger-link",
+                                command=lambda i=item, f=row_frame: self._remove_item_from_ignore_list(i, item_list, var_dict, f))
+        delete_btn.pack(side="right", padx=5)
+
+    def _update_recent_menus(self):
+        recent_roots, recent_results = read_recent_paths()
+        
+        self.root_recent_menu.delete(0, "end")
+        for path in recent_roots:
+            self.root_recent_menu.add_command(label=path, command=lambda p=path: self.root_dir_var.set(p))
+        
+        self.result_recent_menu.delete(0, "end")
+        for path in recent_results:
+            self.result_recent_menu.add_command(label=path, command=lambda p=path: self.result_dir_var.set(p))
 
     def _set_root_default(self):
         self.default_root_dir = self.root_dir_var.get().strip()
@@ -180,15 +211,19 @@ class ProjectStructureApp:
         item_list.append(new_item)
         var.set("")
         
-        # Add new checkbox
-        bool_var = ttk.BooleanVar(value=True)
-        var_dict[new_item] = bool_var
-        cb = ttk.Checkbutton(scroll_frame, text=new_item, variable=bool_var, bootstyle="round-toggle")
-        cb.pack(anchor="w", padx=15, pady=5, fill='x')
-        
+        self._add_ignore_checkbox(new_item, item_list, var_dict, scroll_frame)
         self._save_settings()
 
-    def _get_active_ignores(self, item_list, var_dict):
+    def _remove_item_from_ignore_list(self, item_to_remove, item_list, var_dict, frame_widget):
+        if item_to_remove in item_list:
+            item_list.remove(item_to_remove)
+        if item_to_remove in var_dict:
+            del var_dict[item_to_remove]
+        
+        frame_widget.destroy()
+        self._save_settings()
+
+    def _get_active_ignores(self, var_dict):
         return [name for name, var in var_dict.items() if var.get()]
     
     def _choose_root_dir(self):
@@ -206,52 +241,94 @@ class ProjectStructureApp:
             messagebox.showwarning("警告", "请先填写项目根目录和输出目录!")
             return None, None, None, None
         
-        active_ignore_dirs = self._get_active_ignores(self.ignore_dirs, self.ignore_dir_vars)
-        active_ignore_types = self._get_active_ignores(self.ignore_file_types, self.ignore_type_vars)
+        active_ignore_dirs = self._get_active_ignores(self.ignore_dir_vars)
+        active_ignore_types = self._get_active_ignores(self.ignore_type_vars)
         
         return root_dir, result_dir, active_ignore_dirs, active_ignore_types
+
+    def _execute_and_log(self, action_name, action_func):
+        params = self._get_common_generation_params()
+        if not params[0]: return None, []
+        
+        root_dir, result_dir, ignores, ignore_types = params
+        start_time = time.time()
+        
+        try:
+            stats, *other_results = action_func()
+            duration = round(time.time() - start_time, 2)
+            
+            if stats is None: stats = {}
+            stats['duration'] = duration
+            stats['status'] = 'success'
+            
+            log_action(action_name, root_dir, result_dir, ignores, ignore_types, stats)
+            self._update_recent_menus()
+            
+            return stats, other_results
+
+        except Exception as e:
+            duration = round(time.time() - start_time, 2)
+            
+            error_stats = {
+                'duration': duration,
+                'status': 'error',
+                'message': str(e)
+            }
+            log_action(action_name, root_dir, result_dir, ignores, ignore_types, error_stats)
+            self._update_recent_menus()
+            
+            messagebox.showerror("错误", f"执行 '{action_name}' 时出错：\n{e}")
+            self.status_var.set(f"❌ 执行 '{action_name}' 失败")
+            return None, []
 
     def _generate_json(self):
         params = self._get_common_generation_params()
         if not params[0]: return
         root_dir, result_dir, ignores, ignore_file_types = params
-        try:
+        
+        def action():
             writer = Writer(root_dir, ignores, ignore_file_types)
             result_path = Path(result_dir) / self.content_file
-            writer.updateFile(result_path)
-            self.status_var.set(f"✅ JSON 已生成: {result_path}")
+            stats = writer.updateFile(result_path)
+            return stats, result_path
+
+        stats, results = self._execute_and_log("generate_json", action)
+        if stats and stats.get('status') == 'success':
+            result_path = results[0]
+            self.status_var.set(f"✅ JSON 已生成: {result_path} (耗时: {stats['duration']}s)")
             messagebox.showinfo("成功", f"JSON 文件生成成功！\n{result_path}")
-        except Exception as e:
-            messagebox.showerror("错误", f"生成 JSON 时出错：\n{e}")
-            self.status_var.set("❌ 生成 JSON 失败")
 
     def _generate_xml(self):
         params = self._get_common_generation_params()
         if not params[0]: return
         root_dir, result_dir, ignores, ignore_file_types = params
-        try:
+
+        def action():
             writer = XmlWriter(root_dir, ignores, ignore_file_types)
             result_path = Path(result_dir) / self.xml_file
-            writer.updateFile(result_path)
-            self.status_var.set(f"✅ XML 已生成: {result_path}")
+            return writer.updateFile(result_path), result_path
+
+        stats, results = self._execute_and_log("generate_xml", action)
+        if stats and stats.get('status') == 'success':
+            result_path = results[0]
+            self.status_var.set(f"✅ XML 已生成: {result_path} (耗时: {stats['duration']}s)")
             messagebox.showinfo("成功", f"XML 文件生成成功！\n{result_path}")
-        except Exception as e:
-            messagebox.showerror("错误", f"生成 XML 时出错：\n{e}")
-            self.status_var.set("❌ 生成 XML 失败")
 
     def _generate_tree(self):
         params = self._get_common_generation_params()
         if not params[0]: return
         root_dir, result_dir, ignores, ignore_file_types = params
-        try:
+
+        def action():
             tree = TreeBuilder(root_dir, ignores, ignore_file_types)
             result_path = Path(result_dir) / self.tree_file
-            content = tree.buildTree(result_path)
-            self.status_var.set(f"✅ 目录树已生成: {result_path}")
+            return tree.buildTree(result_path)
+
+        stats, results = self._execute_and_log("generate_tree", action)
+        if stats and stats.get('status') == 'success':
+            content = results[0]
+            self.status_var.set(f"✅ 目录树已生成 (耗时: {stats['duration']}s)")
             self._show_tree_window(content)
-        except Exception as e:
-            messagebox.showerror("错误", f"生成目录树时出错：\n{e}")
-            self.status_var.set("❌ 生成目录树失败")
 
     def _restore_project(self):
         source_file = filedialog.askopenfilename(title="选择要还原的 JSON 或 XML 文件", filetypes=[("Project Files", "*.json *.xml"), ("All files", "*.*")])
@@ -262,18 +339,18 @@ class ProjectStructureApp:
         self.status_var.set("正在还原项目...")
         self.root.update_idletasks()
         
-        try:
+        def action():
             restorer = ProjectRestorer(source_file, target_root)
-            success, message = restorer.restore()
-            if success:
-                self.status_var.set(f"✅ {Path(source_file).name} 已成功还原！")
-                messagebox.showinfo("成功", message)
-            else:
-                self.status_var.set("❌ 还原失败！")
-                messagebox.showerror("错误", message)
-        except Exception as e:
-            self.status_var.set("❌ 还原失败！")
-            messagebox.showerror("错误", f"执行还原时发生意外错误：\n{e}")
+            success, message, stats = restorer.restore()
+            if not success:
+                raise Exception(message)
+            return stats, message
+        
+        stats, results = self._execute_and_log("restore_project", action)
+        if stats and stats.get('status') == 'success':
+            message = results[0]
+            self.status_var.set(f"✅ {Path(source_file).name} 已成功还原！ (耗时: {stats['duration']}s)")
+            messagebox.showinfo("成功", message)
 
     def _show_tree_window(self, content):
         win = ttk.Toplevel(self.root)

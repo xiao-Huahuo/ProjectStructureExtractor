@@ -4,12 +4,9 @@ import os
 import re
 from xml.sax.saxutils import escape
 
-# 定义一个正则表达式，用于匹配所有不符合 XML 1.0 规范的字符
-# 包括大部分 C0 和 C1 控制字符，但不包括 \t, \n, \r
 _illegal_xml_chars_re = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f]')
 
 def _strip_illegal_xml_chars(s):
-    """从字符串中移除所有非法的XML字符"""
     return _illegal_xml_chars_re.sub('', s)
 
 class XmlWriter:
@@ -18,12 +15,13 @@ class XmlWriter:
         self.entries = Extractor(root_dir, ignore_dirs, ignore_file_types).extractProjectStructure()
 
     def updateFile(self, filename):
-        # 手动构建XML字符串以完全控制输出
         xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n', '<project>\n']
 
         file_count = 0
+        dir_count = 0
         for entry in self.entries:
             if entry.type == EntryType.DIRECTORY:
+                dir_count += 1
                 continue
             
             file_count += 1
@@ -46,13 +44,10 @@ class XmlWriter:
                 except Exception as e:
                     raw_content = f"Error reading file: {e}"
                 
-                # 在这里进行“消毒”，移除所有非法字符
                 content = _strip_illegal_xml_chars(raw_content)
             
-            # 手动为属性值添加引号
             xml_parts.append(f'  <file path="{escaped_path}">\n')
             
-            # 如果内容包含 "]]>" 这个特殊序列，就回退到标准转义，否则使用CDATA
             if ']]>' in content:
                 xml_parts.append(f'    <content>{escape(content)}</content>\n')
             else:
@@ -68,4 +63,6 @@ class XmlWriter:
         goal_file.parent.mkdir(parents=True, exist_ok=True)
         goal_file.write_text(final_xml, encoding='utf-8')
 
+        stats = {"files": file_count, "dirs": dir_count}
         print(f"XML 文件已生成：{goal_file.resolve()}，共 {file_count} 个文件。")
+        return stats
