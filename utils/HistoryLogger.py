@@ -1,9 +1,20 @@
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "log"
+def get_base_path():
+    """获取应用的基础路径，兼容开发模式和PyInstaller打包后的模式"""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # 打包后运行
+        return Path(sys.executable).parent
+    else:
+        # 开发模式运行
+        return Path(__file__).resolve().parent.parent
+
+BASE_PATH = get_base_path()
+LOG_DIR = BASE_PATH / "log"
 HISTORY_FILE = LOG_DIR / "history.jsonl"
 MAX_RECENTS = 10
 
@@ -14,13 +25,6 @@ def _ensure_log_dir():
 def log_action(action_type, root_dir, result_dir, ignore_dirs, ignore_types, stats=None):
     """
     记录一个操作到历史日志中。
-
-    :param action_type: 操作类型 (e.g., 'generate_json', 'restore_project')
-    :param root_dir: 项目根目录
-    :param result_dir: 输出目录
-    :param ignore_dirs: 忽略的目录列表
-    :param ignore_types: 忽略的文件类型列表
-    :param stats: 一个包含统计信息（如文件数、耗时）的字典
     """
     _ensure_log_dir()
     
@@ -49,7 +53,6 @@ def read_recent_paths():
     
     try:
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            # 从后往前读取文件，以获取最新的记录
             lines = f.readlines()
             for line in reversed(lines):
                 if not line.strip():
@@ -66,11 +69,9 @@ def read_recent_paths():
                     if result_dir and result_dir not in recent_results and len(recent_results) < MAX_RECENTS:
                         recent_results.append(result_dir)
                     
-                    # 如果两个列表都满了，就提前结束
                     if len(recent_roots) >= MAX_RECENTS and len(recent_results) >= MAX_RECENTS:
                         break
                 except json.JSONDecodeError:
-                    # 忽略损坏的行
                     continue
     except Exception as e:
         print(f"读取历史记录时出错: {e}")
