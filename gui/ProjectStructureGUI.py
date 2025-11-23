@@ -13,6 +13,9 @@ import os
 import sys
 import subprocess
 import time
+import random
+import threading
+from datetime import datetime
 from configure.defaultSettings import *
 
 def get_system_theme():
@@ -39,12 +42,20 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class ProjectStructureApp:
+    TIPS = [
+        "你知道吗？你可以通过'最近'按钮快速访问历史目录。",
+        "小贴士：点击'设为默认'可以保存当前路径，下次启动时自动加载。",
+        "所有操作都会记录在 'log/history.jsonl' 文件中，方便追溯。",
+        "暗色模式更护眼哦，点击右上角的图标试试吧！",
+        "想恢复初始设置？试试主按钮区的'重置设置'功能吧。"
+    ]
+
     def __init__(self):
         self.settings = self._load_settings()
         self.root = ttk.Window(themename=self.settings.get("THEME", "litera"))
         
         self.root.title("📁 项目结构生成器")
-        self.root.geometry("880x580")
+        self.root.geometry("880x600")
         self.root.resizable(True, False)
 
         self.default_root_dir = self.settings["ROOT_DIR"]
@@ -60,9 +71,20 @@ class ProjectStructureApp:
         
         self.root_dir_var = ttk.StringVar(value=self.settings["ROOT_DIR"])
         self.result_dir_var = ttk.StringVar(value=self.settings["RESULT_DIR"])
+        self.status_var = ttk.StringVar()
+        self.file_count_var = ttk.StringVar()
+        self.tip_update_job = None
 
         self._build_ui()
         self._update_recent_menus()
+        
+        self.root_dir_var.trace_add("write", self._on_root_dir_change)
+        
+        self._set_greeting()
+        self._schedule_tip_update()
+        
+        self._on_root_dir_change() # Trigger initial count
+        
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.mainloop()
 
@@ -118,21 +140,23 @@ class ProjectStructureApp:
         frame.pack(padx=20, pady=10, fill="x", expand=True)
         frame.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(frame, text="项目根目录:").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Label(frame, text="项目根目录:").grid(row=0, column=0, sticky="w", pady=2)
         ttk.Entry(frame, textvariable=self.root_dir_var).grid(row=0, column=1, padx=5, sticky="ew")
         ttk.Button(frame, text="选择", command=self._choose_root_dir, bootstyle="secondary-outline").grid(row=0, column=2)
         ttk.Button(frame, text="设为默认", command=self._set_root_default, bootstyle="secondary-outline").grid(row=0, column=3, padx=5)
         self.root_recent_menu = ttk.Menu(self.root, tearoff=0)
         self.root_recent_btn = ttk.Menubutton(frame, text="最近", menu=self.root_recent_menu, bootstyle="secondary-outline")
         self.root_recent_btn.grid(row=0, column=4, padx=5)
+        
+        ttk.Label(frame, textvariable=self.file_count_var, bootstyle="secondary").grid(row=1, column=1, sticky='w', padx=5)
 
-        ttk.Label(frame, text="输出目录:").grid(row=1, column=0, sticky="w", pady=5)
-        ttk.Entry(frame, textvariable=self.result_dir_var).grid(row=1, column=1, padx=5, sticky="ew")
-        ttk.Button(frame, text="选择", command=self._choose_result_dir, bootstyle="secondary-outline").grid(row=1, column=2)
-        ttk.Button(frame, text="设为默认", command=self._set_result_default, bootstyle="secondary-outline").grid(row=1, column=3, padx=5)
+        ttk.Label(frame, text="输出目录:").grid(row=2, column=0, sticky="w", pady=2)
+        ttk.Entry(frame, textvariable=self.result_dir_var).grid(row=2, column=1, padx=5, sticky="ew")
+        ttk.Button(frame, text="选择", command=self._choose_result_dir, bootstyle="secondary-outline").grid(row=2, column=2)
+        ttk.Button(frame, text="设为默认", command=self._set_result_default, bootstyle="secondary-outline").grid(row=2, column=3, padx=5)
         self.result_recent_menu = ttk.Menu(self.root, tearoff=0)
         self.result_recent_btn = ttk.Menubutton(frame, text="最近", menu=self.result_recent_menu, bootstyle="secondary-outline")
-        self.result_recent_btn.grid(row=1, column=4, padx=5)
+        self.result_recent_btn.grid(row=2, column=4, padx=5)
 
         ignore_main_frame = ttk.Frame(self.root)
         ignore_main_frame.pack(padx=20, pady=10, fill="both", expand=True)
@@ -151,7 +175,6 @@ class ProjectStructureApp:
         self.progress_bar = ttk.Progressbar(self.root, mode='determinate')
         self.progress_bar.pack(fill='x', padx=20, pady=(0, 5))
         
-        self.status_var = ttk.StringVar(value="等待操作中...")
         ttk.Label(self.root, textvariable=self.status_var, anchor="w").pack(side="bottom", fill="x", padx=20, pady=5)
 
     def _build_ignore_frame(self, parent, title, item_list, var_dict, add_command, side):
@@ -199,15 +222,60 @@ class ProjectStructureApp:
         for path in recent_results:
             self.result_recent_menu.add_command(label=path, command=lambda p=path: self.result_dir_var.set(p))
 
+    def _set_greeting(self):
+        hour = datetime.now().hour
+        if 5 <= hour < 12:
+            greeting = "早上好！"
+        elif 12 <= hour < 18:
+            greeting = "下午好！"
+        else:
+            greeting = "晚上好！"
+        self.status_var.set(greeting)
+
+    def _schedule_tip_update(self, delay=30000):
+        if self.tip_update_job:
+            self.root.after_cancel(self.tip_update_job)
+        self.tip_update_job = self.root.after(delay, self._update_tip)
+
+    def _update_tip(self):
+        tip = random.choice(self.TIPS)
+        self.status_var.set(tip)
+        self._schedule_tip_update()
+
+    def _on_root_dir_change(self, *args):
+        self._start_background_count()
+
+    def _start_background_count(self):
+        thread = threading.Thread(target=self._background_count_task, daemon=True)
+        thread.start()
+
+    def _background_count_task(self):
+        path = self.root_dir_var.get()
+        if os.path.isdir(path):
+            self.file_count_var.set("正在计算...")
+            try:
+                active_ignore_dirs = self._get_active_ignores(self.ignore_dir_vars)
+                active_ignore_types = self._get_active_ignores(self.ignore_type_vars)
+                extractor = Extractor(path, active_ignore_dirs, active_ignore_types)
+                count = extractor.count_items()
+                self.file_count_var.set(f"（检测到约 {count} 个项目）")
+            except Exception as e:
+                self.file_count_var.set("(计算失败)")
+                print(f"后台计数失败: {e}")
+        else:
+            self.file_count_var.set("")
+
     def _set_root_default(self):
         self.default_root_dir = self.root_dir_var.get().strip()
         self._save_settings()
         self.status_var.set("✅ 新的根目录已设为默认")
+        self._schedule_tip_update(5000)
 
     def _set_result_default(self):
         self.default_result_dir = self.result_dir_var.get().strip()
         self._save_settings()
         self.status_var.set("✅ 新的输出目录已设为默认")
+        self._schedule_tip_update(5000)
 
     def _add_ignore_dir(self, var):
         self._add_item_to_ignore_list(var, self.ignore_dirs, "目录", self.ignore_dir_vars, self.left_scroll_frame)
@@ -284,7 +352,6 @@ class ProjectStructureApp:
             stats = {}
             other_results = []
             
-            # The action_func is now a generator
             action_generator = action_func(extractor.extract_project_structure())
             for result in action_generator:
                 if isinstance(result, (int, float)):
@@ -314,6 +381,7 @@ class ProjectStructureApp:
         finally:
             self.progress_bar.stop()
             self.progress_bar['value'] = 0
+            self._schedule_tip_update(10000)
 
     def _generate_json(self):
         params = self._get_common_generation_params()
@@ -322,7 +390,6 @@ class ProjectStructureApp:
         def action(entries_generator):
             writer = Writer()
             result_path = Path(params[1]) / self.content_file
-            # This is now a generator, so we need to exhaust it
             final_stats = None
             for result in writer.updateFile(result_path, entries_generator):
                 if isinstance(result, (int, float)):
@@ -380,7 +447,6 @@ class ProjectStructureApp:
             self._show_tree_window(content)
 
     def _restore_project(self):
-        # Restore project does not use the two-pass scanner, so it's handled differently
         source_file = filedialog.askopenfilename(title="选择要还原的 JSON 或 XML 文件", filetypes=[("Project Files", "*.json *.xml"), ("All files", "*.*")])
         if not source_file: return
         target_root = filedialog.askdirectory(title="选择要将项目还原到的目录")
@@ -401,7 +467,6 @@ class ProjectStructureApp:
             stats['duration'] = duration
             stats['status'] = 'success'
             
-            # Manually log this action as it doesn't fit the standard generator pattern
             log_action("restore_project", "N/A", target_root, [], [], stats)
             self._update_recent_menus()
 
@@ -417,6 +482,7 @@ class ProjectStructureApp:
             self.status_var.set(f"❌ 执行 'restore_project' 失败")
         finally:
             self.progress_bar.stop()
+            self._schedule_tip_update(10000)
 
     def _show_tree_window(self, content):
         win = ttk.Toplevel(self.root)
