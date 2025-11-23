@@ -10,7 +10,7 @@ import json
 import os
 import sys
 import subprocess
-from defaultSettings import *
+from configure.defaultSettings import *
 
 def get_system_theme():
     """
